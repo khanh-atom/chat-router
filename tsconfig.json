@@ -18,7 +18,7 @@
 	},
 	"exclude": [
 		"mcp-permissions.js",
-		"claude-code-chat-permissions-mcp",
+		"chat-router-permissions-mcp",
 		"backup-files"
 	]
 }

@@ -13797,7 +13797,7 @@ var StdioServerTransport = class {
 var fs = __toESM(require("fs"));
 var path = __toESM(require("path"));
 var server = new McpServer({
-  name: "Claude Code Permissions MCP Server",
+  name: "Chat Router Permissions MCP Server",
   version: "0.0.1"
 });
 var PERMISSIONS_PATH = process.env.CLAUDE_PERMISSIONS_PATH;

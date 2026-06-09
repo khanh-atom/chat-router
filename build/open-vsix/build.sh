@@ -7,7 +7,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VERSION="2.1.0"
-OUTPUT_NAME="vsix-claude-code-chat-${VERSION}.vsix"
+OUTPUT_NAME="vsix-chat-router-${VERSION}.vsix"
 
 echo "Building Open VSIX version ${VERSION}..."
 
@@ -30,7 +30,7 @@ if [ -f "icon-bubble.png" ]; then
 fi
 
 # Apply Open VSIX changes to package.json
-sed -i.bak 's/"displayName": "Chat for Claude Code"/"displayName": "Claude Code Chat"/' package.json
+sed -i.bak 's/"displayName": "Chat Router"/"displayName": "Chat Router"/' package.json
 sed -i.bak 's/"icon": "icon-bubble.png"/"icon": "icon.png"/g' package.json
 rm -f package.json.bak
 

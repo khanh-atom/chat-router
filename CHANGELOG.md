@@ -1,6 +1,6 @@
 # Change Log
 
-All notable changes to the "claude-code-chat" extension will be documented in this file.
+All notable changes to the "chat-router" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
@@ -33,7 +33,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [2.0.6] - 2026-04-23
 
 ### 🚀 Features Added
-- **Smarter post-install setup**: Fresh installs now "just work" without a VS Code restart. After install, the extension checks whether `claude` resolved on your PATH and, if not, auto-configures `claudeCodeChat.executable.path` to the known install location. An existing custom executable path is respected.
+- **Smarter post-install setup**: Fresh installs now "just work" without a VS Code restart. After install, the extension checks whether `claude` resolved on your PATH and, if not, auto-configures `chatRouter.executable.path` to the known install location. An existing custom executable path is respected.
 - **WSL: Node.js path is now optional**: Recent Claude Code ships as a native binary and doesn't need Node. Leave the **Node.js Path** field blank unless you installed Claude via npm. The WSL settings panel was also reordered so **Claude Path** comes first.
 
 ### 🐛 Bug Fixes
@@ -151,7 +151,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 ## [1.0.5] - 2025-07-30
 
 ### 🚀 Features Added
-- **MCP Integration**: Added claude-code-chat-permissions-mcp folder for enhanced permission management
+- **MCP Integration**: Added chat-router-permissions-mcp folder for enhanced permission management
 - **Message Persistence**: Save message in text box for better user experience
 - **UI Improvements**: Always display history and new chat options
 - **Input Enhancement**: Removed maxlength limit for custom command prompt textarea
@@ -168,7 +168,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ### 🐛 Bug Fixes
 - Fixed input text area overflow issue by adding `box-sizing: border-box` to prevent padding from extending beyond container width
-- Fixed command parameter handling for `claude-code-chat.openChat` to properly handle both ViewColumn and Uri parameters from different invocation contexts
+- Fixed command parameter handling for `chat-router.openChat` to properly handle both ViewColumn and Uri parameters from different invocation contexts
 
 ### 🔧 Technical Improvements
 - Enhanced `show()` method to accept optional ViewColumn parameter with ViewColumn.Two as default
@@ -211,7 +211,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 - Drag-and-drop image support directly into chat
 - Clipboard image paste functionality (Ctrl+V for screenshots)
 - Multiple image selection with VS Code's native file picker
-- Automatic image organization in `.claude/claude-code-chat-images/` folder
+- Automatic image organization in `.claude/chat-router-images/` folder
 - Automatic `.gitignore` creation for image folders
 - Support for PNG, JPG, JPEG, GIF, SVG, WebP, BMP formats
 
@@ -282,7 +282,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ### 🔄 Breaking Changes
 - Permission system now requires explicit approval for tool execution (unless YOLO mode is enabled)
-- Image files are now stored in `.claude/claude-code-chat-images/` instead of root directory
+- Image files are now stored in `.claude/chat-router-images/` instead of root directory
 - MCP configuration moved to extension storage instead of global config
 
 ### 📚 Documentation & Community
@@ -418,10 +418,10 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 ### Added
 - WSL (Windows Subsystem for Linux) configuration support
-  - New setting: `claudeCodeChat.wsl.enabled` to enable WSL integration
-  - New setting: `claudeCodeChat.wsl.distro` to specify WSL distribution
-  - New setting: `claudeCodeChat.wsl.nodePath` to configure Node.js path in WSL
-  - New setting: `claudeCodeChat.wsl.claudePath` to configure Claude path in WSL
+  - New setting: `chatRouter.wsl.enabled` to enable WSL integration
+  - New setting: `chatRouter.wsl.distro` to specify WSL distribution
+  - New setting: `chatRouter.wsl.nodePath` to configure Node.js path in WSL
+  - New setting: `chatRouter.wsl.claudePath` to configure Claude path in WSL
 - Automatic detection of execution environment (native vs WSL)
 - WSL support for Claude login terminal command
 

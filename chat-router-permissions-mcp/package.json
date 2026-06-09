@@ -1,5 +1,5 @@
 {
-  "name": "claude-code-chat-permissions-mcp",
+  "name": "chat-router-permissions-mcp",
   "version": "1.0.0",
   "main": "dist/mcp-permissions.js",
   "scripts": {

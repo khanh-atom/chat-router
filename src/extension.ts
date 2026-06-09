@@ -36,17 +36,17 @@ export function activate(context: vscode.ExtensionContext) {
 	}
 	const provider = new ClaudeChatProvider(context.extensionUri, context);
 
-	const disposable = vscode.commands.registerCommand('claude-code-chat.openChat', (column?: vscode.ViewColumn) => {
+	const disposable = vscode.commands.registerCommand('chat-router.openChat', (column?: vscode.ViewColumn) => {
 		provider.show(column);
 	});
 
-	const loadConversationDisposable = vscode.commands.registerCommand('claude-code-chat.loadConversation', (filename: string) => {
+	const loadConversationDisposable = vscode.commands.registerCommand('chat-router.loadConversation', (filename: string) => {
 		provider.loadConversation(filename);
 	});
 
 	// Register webview view provider for sidebar chat (using shared provider instance)
 	const webviewProvider = new ClaudeChatWebviewProvider(context.extensionUri, provider);
-	vscode.window.registerWebviewViewProvider('claude-code-chat.chat', webviewProvider);
+	vscode.window.registerWebviewViewProvider('chat-router.chat', webviewProvider);
 
 	// Register custom content provider for read-only diff views
 	const diffProvider = new DiffContentProvider();
@@ -54,7 +54,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Listen for configuration changes
 	const configChangeDisposable = vscode.workspace.onDidChangeConfiguration(event => {
-		if (event.affectsConfiguration('claudeCodeChat.wsl')) {
+		if (event.affectsConfiguration('chatRouter.wsl')) {
 			provider.newSessionOnConfigChange();
 		}
 	});
@@ -62,22 +62,22 @@ export function activate(context: vscode.ExtensionContext) {
 	// Create status bar item
 	const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
 	statusBarItem.text = "Claude";
-	statusBarItem.tooltip = "Open Claude Code Chat (Ctrl+Shift+C)";
-	statusBarItem.command = 'claude-code-chat.openChat';
+	statusBarItem.tooltip = "Open Chat Router (Ctrl+Shift+C)";
+	statusBarItem.command = 'chat-router.openChat';
 	statusBarItem.show();
 
 	// Register URI handler for deep links (e.g., OpenCredits key callback)
 	const uriHandler = vscode.window.registerUriHandler({
 		async handleUri(uri: vscode.Uri) {
 
-			// Handle OpenCredits key callback: vscode://AndrePimenta.claude-code-chat/opencredits-key?key=xxx
+			// Handle OpenCredits key callback: vscode://atom8n.chat-router/opencredits-key?key=xxx
 			if (uri.path === '/opencredits-key') {
 				const params = new URLSearchParams(uri.query);
 				const key = params.get('key');
 
 				if (key) {
 					// Save the key and OpenCredits env vars
-					const config = vscode.workspace.getConfiguration('claudeCodeChat');
+					const config = vscode.workspace.getConfiguration('chatRouter');
 					const envVars = config.get<Record<string, string>>('environment.variables', {});
 					envVars['ANTHROPIC_AUTH_TOKEN'] = key;
 					envVars['ANTHROPIC_BASE_URL'] = OPENCREDITS_API_URL;
@@ -88,7 +88,7 @@ export function activate(context: vscode.ExtensionContext) {
 					await provider.handleOpenCreditsKeyReceived(key);
 
 					// Show success message
-					vscode.window.showInformationMessage('OpenCredits account connected! You can now use Claude Code Chat.', 'Open Chat').then(selection => {
+					vscode.window.showInformationMessage('OpenCredits account connected! You can now use Chat Router.', 'Open Chat').then(selection => {
 						if (selection === 'Open Chat') {
 							provider.show();
 						}
@@ -237,7 +237,7 @@ class ClaudeChatProvider {
 
 		this._panel = vscode.window.createWebviewPanel(
 			'claudeChat',
-			'Claude Code Chat',
+			'Chat Router',
 			actualColumn,
 			{
 				enableScripts: true,
@@ -277,14 +277,14 @@ class ClaudeChatProvider {
 
 	// Get the OpenCredits API key from environment variables
 	private _getOpenCreditsKey(): string {
-		const config = vscode.workspace.getConfiguration('claudeCodeChat');
+		const config = vscode.workspace.getConfiguration('chatRouter');
 		const envVars = config.get<Record<string, string>>('environment.variables', {});
 		return envVars['ANTHROPIC_AUTH_TOKEN'] || '';
 	}
 
 	// Check if the configured base URL points to OpenCredits
 	private _isOpenCredits(): boolean {
-		const config = vscode.workspace.getConfiguration('claudeCodeChat');
+		const config = vscode.workspace.getConfiguration('chatRouter');
 		if (config.get<boolean>('environment.disabled', false)) {
 			return false;
 		}
@@ -294,7 +294,7 @@ class ClaudeChatProvider {
 	}
 
 	private async _setEnvsDisabled(disabled: boolean): Promise<void> {
-		const config = vscode.workspace.getConfiguration('claudeCodeChat');
+		const config = vscode.workspace.getConfiguration('chatRouter');
 		await config.update('environment.disabled', disabled, vscode.ConfigurationTarget.Global);
 		this._sendCurrentSettings();
 
@@ -453,7 +453,7 @@ class ClaudeChatProvider {
 				this._sendCurrentSettings();
 				return;
 			case 'getEnvVars': {
-				const evConfig = vscode.workspace.getConfiguration('claudeCodeChat');
+				const evConfig = vscode.workspace.getConfiguration('chatRouter');
 				const evVars = evConfig.get<Record<string, string>>('environment.variables', {});
 				this._postMessage({ type: 'envVarsData', data: evVars });
 				return;
@@ -502,7 +502,7 @@ class ClaudeChatProvider {
 			case 'opencreditsKeyFromCheckout':
 				if (message.key) {
 					// Save the key and OpenCredits env vars (same as URI handler)
-					const checkoutConfig = vscode.workspace.getConfiguration('claudeCodeChat');
+					const checkoutConfig = vscode.workspace.getConfiguration('chatRouter');
 					const checkoutEnvVars = checkoutConfig.get<Record<string, string>>('environment.variables', {});
 					checkoutEnvVars['ANTHROPIC_AUTH_TOKEN'] = message.key;
 					checkoutEnvVars['ANTHROPIC_BASE_URL'] = OPENCREDITS_API_URL;
@@ -525,7 +525,7 @@ class ClaudeChatProvider {
 					const focusCmd = process.platform === 'darwin' ? 'open'
 						: process.platform === 'win32' ? 'start'
 						: 'xdg-open';
-					cp.spawn(focusCmd, [`${vscode.env.uriScheme}://AndrePimenta.claude-code-chat/focus`], { detached: true, stdio: 'ignore' }).unref();
+					cp.spawn(focusCmd, [`${vscode.env.uriScheme}://atom8n.chat-router/focus`], { detached: true, stdio: 'ignore' }).unref();
 				}
 				return;
 			case 'openOpenCreditsAccount':
@@ -534,7 +534,7 @@ class ClaudeChatProvider {
 			case 'restoreOpenCredits': {
 				const savedKey = await this._getSavedOpenCreditsKey();
 				if (savedKey) {
-					const restoreConfig = vscode.workspace.getConfiguration('claudeCodeChat');
+					const restoreConfig = vscode.workspace.getConfiguration('chatRouter');
 					const restoreEnvVars = restoreConfig.get<Record<string, string>>('environment.variables', {});
 					restoreEnvVars['ANTHROPIC_AUTH_TOKEN'] = savedKey;
 					restoreEnvVars['ANTHROPIC_BASE_URL'] = OPENCREDITS_API_URL;
@@ -550,7 +550,7 @@ class ClaudeChatProvider {
 			}
 			case 'saveCustomProvider':
 				if (message.envVars) {
-					const cpConfig = vscode.workspace.getConfiguration('claudeCodeChat');
+					const cpConfig = vscode.workspace.getConfiguration('chatRouter');
 					const cpEnvVars = cpConfig.get<Record<string, string>>('environment.variables', {});
 					Object.assign(cpEnvVars, message.envVars);
 					cpConfig.update('environment.variables', cpEnvVars, vscode.ConfigurationTarget.Global).then(
@@ -864,7 +864,7 @@ class ClaudeChatProvider {
 		const cwd = workspaceFolder ? workspaceFolder.uri.fsPath : process.cwd();
 
 		// Get thinking intensity setting
-		const configThink = vscode.workspace.getConfiguration('claudeCodeChat');
+		const configThink = vscode.workspace.getConfiguration('chatRouter');
 		const thinkingIntensity = configThink.get<string>('thinking.intensity', 'think');
 
 		// Prepend thinking mode instructions if enabled
@@ -932,7 +932,7 @@ class ClaudeChatProvider {
 		];
 
 		// Get configuration
-		const config = vscode.workspace.getConfiguration('claudeCodeChat');
+		const config = vscode.workspace.getConfiguration('chatRouter');
 		const yoloMode = config.get<boolean>('permissions.yoloMode', false);
 
 		if (yoloMode) {
@@ -1712,7 +1712,7 @@ class ClaudeChatProvider {
 
 				// Initialize git repo with workspace as work-tree
 				await exec(`git --git-dir="${this._backupRepoPath}" --work-tree="${workspacePath}" init`);
-				await exec(`git --git-dir="${this._backupRepoPath}" config user.name "Claude Code Chat"`);
+				await exec(`git --git-dir="${this._backupRepoPath}" config user.name "Chat Router"`);
 				await exec(`git --git-dir="${this._backupRepoPath}" config user.email "claude@anthropic.com"`);
 
 			}
@@ -2733,7 +2733,7 @@ class ClaudeChatProvider {
 			if (extPath) {
 				const extServers = await this._readMCPConfigFile(extPath);
 				for (const [name, config] of Object.entries(extServers)) {
-					if (name === 'claude-code-chat-permissions') continue;
+					if (name === 'chat-router-permissions') continue;
 					servers[name] = { ...config as any, _scope: 'extension' };
 				}
 			}
@@ -2912,7 +2912,7 @@ class ClaudeChatProvider {
 	}
 
 	private convertToWSLPath(windowsPath: string): string {
-		const config = vscode.workspace.getConfiguration('claudeCodeChat');
+		const config = vscode.workspace.getConfiguration('chatRouter');
 		const wslEnabled = config.get<boolean>('wsl.enabled', false);
 
 		if (wslEnabled && windowsPath.match(/^[a-zA-Z]:/)) {
@@ -3360,7 +3360,7 @@ class ClaudeChatProvider {
 	}
 
 	private _sendCurrentSettings(): void {
-		const config = vscode.workspace.getConfiguration('claudeCodeChat');
+		const config = vscode.workspace.getConfiguration('chatRouter');
 		const settings = {
 			'thinking.intensity': config.get<string>('thinking.intensity', 'think'),
 			'wsl.enabled': config.get<boolean>('wsl.enabled', false),
@@ -3384,7 +3384,7 @@ class ClaudeChatProvider {
 	private async _enableYoloMode(): Promise<void> {
 		try {
 			// Update VS Code configuration to enable YOLO mode
-			const config = vscode.workspace.getConfiguration('claudeCodeChat');
+			const config = vscode.workspace.getConfiguration('chatRouter');
 
 			// Clear any global setting and set workspace setting
 			await config.update('permissions.yoloMode', true, vscode.ConfigurationTarget.Workspace);
@@ -3403,7 +3403,7 @@ class ClaudeChatProvider {
 	}
 
 	private async _updateSettings(settings: { [key: string]: any }): Promise<void> {
-		const config = vscode.workspace.getConfiguration('claudeCodeChat');
+		const config = vscode.workspace.getConfiguration('chatRouter');
 
 		try {
 			for (const [key, value] of Object.entries(settings)) {
@@ -3504,7 +3504,7 @@ class ClaudeChatProvider {
 
 	// Set model env vars for non-Claude models
 	private async _setModelEnvVars(model: string, tierModels?: { sonnet: string; opus: string; haiku: string }): Promise<void> {
-		const config = vscode.workspace.getConfiguration('claudeCodeChat');
+		const config = vscode.workspace.getConfiguration('chatRouter');
 		const envVars = config.get<Record<string, string>>('environment.variables', {});
 		envVars['ANTHROPIC_DEFAULT_SONNET_MODEL'] = tierModels?.sonnet || model;
 		envVars['ANTHROPIC_DEFAULT_OPUS_MODEL'] = tierModels?.opus || model;
@@ -3514,7 +3514,7 @@ class ClaudeChatProvider {
 
 	// Remove model env vars so Claude CLI uses defaults
 	private async _removeModelEnvVars(): Promise<void> {
-		const config = vscode.workspace.getConfiguration('claudeCodeChat');
+		const config = vscode.workspace.getConfiguration('chatRouter');
 		const envVars = config.get<Record<string, string>>('environment.variables', {});
 		const filtered: Record<string, string> = {};
 		for (const [key, value] of Object.entries(envVars)) {
@@ -3645,7 +3645,7 @@ class ClaudeChatProvider {
 	private async _runInstallCommand(method: string = 'installer'): Promise<void> {
 		this._context.globalState.update('installAttempted', true);
 
-		const config = vscode.workspace.getConfiguration('claudeCodeChat');
+		const config = vscode.workspace.getConfiguration('chatRouter');
 		const wslEnabled = config.get<boolean>('wsl.enabled', false);
 		const platform = process.platform;
 		const arch = os.arch();
@@ -3653,13 +3653,13 @@ class ClaudeChatProvider {
 		// WSL install needs to run inside the distro, not on the Windows host.
 		// The old shell-based flow didn't handle this either — not regressing,
 		// not fixing here. User should install claude inside their distro manually
-		// and set claudeCodeChat.wsl.claudePath.
+		// and set chatRouter.wsl.claudePath.
 		if (wslEnabled) {
 			this._postMessage({
 				type: 'installComplete',
 				success: false,
 				method,
-				error: 'WSL mode: please install Claude inside your WSL distro, then set claudeCodeChat.wsl.claudePath.',
+				error: 'WSL mode: please install Claude inside your WSL distro, then set chatRouter.wsl.claudePath.',
 				errorCode: 'WSL_NOT_SUPPORTED',
 				platform,
 				arch
@@ -3729,7 +3729,7 @@ class ClaudeChatProvider {
 	}
 
 	private _buildClaudeTerminalOptions(args: string[] = []): { shellPath: string; shellArgs: string[] } {
-		const config = vscode.workspace.getConfiguration('claudeCodeChat');
+		const config = vscode.workspace.getConfiguration('chatRouter');
 		const wslEnabled = config.get<boolean>('wsl.enabled', false);
 
 		if (wslEnabled) {
@@ -3763,7 +3763,7 @@ class ClaudeChatProvider {
 	private async _ensureLocalRouter(): Promise<number> {
 		// Update model config with the selected model, restoring tier models from persisted env vars
 		if (this._selectedModel && this._selectedModel !== 'default') {
-			const config = vscode.workspace.getConfiguration('claudeCodeChat');
+			const config = vscode.workspace.getConfiguration('chatRouter');
 			const envVars = config.get<Record<string, string>>('environment.variables', {});
 			const sonnet = envVars['ANTHROPIC_DEFAULT_SONNET_MODEL'];
 			const opus = envVars['ANTHROPIC_DEFAULT_OPUS_MODEL'];
@@ -3820,7 +3820,7 @@ class ClaudeChatProvider {
 		const dismissed = this._context.globalState.get<boolean>('wslAlertDismissed', false);
 
 		// Get WSL configuration
-		const config = vscode.workspace.getConfiguration('claudeCodeChat');
+		const config = vscode.workspace.getConfiguration('chatRouter');
 		const wslEnabled = config.get<boolean>('wsl.enabled', false);
 
 		this._postMessage({
@@ -3969,7 +3969,7 @@ class ClaudeChatProvider {
 			const imageFileName = `image_${timestamp}.${extension}`;
 
 			// Create images folder in workspace .claude directory
-			const imagesDir = vscode.Uri.joinPath(workspaceFolder.uri, '.claude', 'claude-code-chat-images');
+			const imagesDir = vscode.Uri.joinPath(workspaceFolder.uri, '.claude', 'chat-router-images');
 			await vscode.workspace.fs.createDirectory(imagesDir);
 
 			// Create .gitignore to ignore all images

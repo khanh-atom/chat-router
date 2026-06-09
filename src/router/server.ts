@@ -76,8 +76,8 @@ function createServer(): http.Server {
         const fetchHeaders = {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${bearerToken}`,
-          "HTTP-Referer": "https://claude-code-chat.local",
-          "X-Title": "Claude-Code-Chat-Router"
+          "HTTP-Referer": "https://chat-router.local",
+          "X-Title": "Chat-Router"
         };
 
         const openaiResponse = await fetch(`${baseUrl}/chat/completions`, {

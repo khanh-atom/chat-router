@@ -5,7 +5,7 @@ import * as fs from "fs";
 import * as path from "path";
 
 const server = new McpServer({
-  name: "Claude Code Permissions MCP Server",
+  name: "Chat Router Permissions MCP Server",
   version: "0.0.1",
 });
 

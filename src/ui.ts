@@ -14,13 +14,13 @@ const getHtml = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'https
 	<meta charset="UTF-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; frame-src *;">
-	<title>Claude Code Chat</title>
+	<title>Chat Router</title>
 	${styles}
 </head>
 <body>
 	<div class="header">
 		<div style="display: flex; align-items: center;">
-			<h2>Claude Code Chat</h2>
+			<h2>Chat Router</h2>
 			<!-- <div id="sessionInfo" class="session-badge" style="display: none;">
 				<span class="session-icon">💬</span>
 				<span id="sessionId">-</span>
@@ -284,7 +284,7 @@ const getHtml = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'https
 	<div id="settingsModal" class="tools-modal" style="display: none;">
 		<div class="tools-modal-content" style="max-height: 600px;">
 			<div class="tools-modal-header">
-				<span>Claude Code Chat Settings</span>
+				<span>Chat Router Settings</span>
 				<button class="tools-close-btn" onclick="hideSettingsModal()">✕</button>
 			</div>
 			<div class="tools-list" style="max-height: none;">

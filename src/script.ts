@@ -2971,7 +2971,7 @@ const getScript = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'htt
 				} else if (errorCode === 'WSL_NOT_SUPPORTED') {
 					successEl.querySelector('.install-success-text').textContent = 'WSL mode';
 					successEl.querySelector('.install-success-hint').textContent =
-						error || 'Install Claude inside your WSL distro and set claudeCodeChat.wsl.claudePath.';
+						error || 'Install Claude inside your WSL distro and set chatRouter.wsl.claudePath.';
 				} else {
 					successEl.querySelector('.install-success-text').textContent = 'Installation failed';
 					successEl.querySelector('.install-success-hint').textContent =
@@ -4828,7 +4828,7 @@ const getScript = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'htt
 			btn.disabled = true;
 
 			try {
-				var res = await fetch('https://claudecodechat.com/api/support', {
+				var res = await fetch('https://chatrouter.com/api/support', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({ type: type, email: email, message: message })

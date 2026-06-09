@@ -1,6 +1,6 @@
-# 🚀 Claude Code Chat - Beautiful Claude Code Chat Interface for VS Code
+# 🚀 Chat Router - Beautiful Chat Router Interface for VS Code
 
-[![VS Code Extension](https://img.shields.io/badge/VS%20Code-Extension-blue?style=for-the-badge&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=andrepimenta.claude-code-chat)
+[![VS Code Extension](https://img.shields.io/badge/VS%20Code-Extension-blue?style=for-the-badge&logo=visual-studio-code)](https://marketplace.visualstudio.com/items?itemName=andrepimenta.chat-router)
 [![Claude Code](https://img.shields.io/badge/Powered%20by-Claude%20Code-orange?style=for-the-badge)](https://claude.ai/code)
 [![TypeScript](https://img.shields.io/badge/Built%20with-TypeScript-3178C6?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 
@@ -12,7 +12,7 @@ Ditch the command line and experience Claude Code like never before. This extens
 
 ---
 
-## ✨ **Why Choose Claude Code Chat?**
+## ✨ **Why Choose Chat Router?**
 
 🖥️ **No Terminal Required** - Beautiful chat interface replaces command-line interactions  
 ⏪ **Restore Checkpoints** - Undo changes and restore code to any previous state  
@@ -23,7 +23,7 @@ Ditch the command line and experience Claude Code like never before. This extens
 ⚡ **Smart Context** - Reference files, paste images, and create custom commands  
 🐧 **Windows/WSL Support** - Full native Windows and WSL support
 
-![Claude Code Chat 1 0 0](https://github.com/user-attachments/assets/5954a74c-eff7-4205-8482-6a1c9de6e102)
+![Chat Router 1 0 0](https://github.com/user-attachments/assets/5954a74c-eff7-4205-8482-6a1c9de6e102)
 
 
 ---
@@ -141,14 +141,14 @@ Ditch the command line and experience Claude Code like never before. This extens
 
 1. **Install from VS Code Marketplace**
    ```
-   ext install claude-code-chat
+   ext install chat-router
    ```
 
 2. **Or install manually**
    - Download the `.vsix` file from releases
-   - Run `code --install-extension claude-code-chat-x.x.x.vsix`
+   - Run `code --install-extension chat-router-x.x.x.vsix`
 
-3. **Open Claude Code Chat**
+3. **Open Chat Router**
    - Press `Ctrl+Shift+C` (or `Cmd+Shift+C` on Mac)
    - Or click the Claude icon in your status bar
    - Or use Command Palette: `Claude Code: Open Chat`
@@ -223,7 +223,7 @@ If you want to revert these changes, just click "Restore Checkpoint" to go back 
 ### Keyboard Shortcuts
 | Shortcut | Action |
 |----------|--------|
-| `Ctrl+Shift+C` | Open Claude Code Chat |
+| `Ctrl+Shift+C` | Open Chat Router |
 | `Enter` | Send message |
 | `@` | Open file picker |
 | `/` | Open slash commands modal |
@@ -232,20 +232,20 @@ If you want to revert these changes, just click "Restore Checkpoint" to go back 
 If you're using Claude Code through WSL (Windows Subsystem for Linux), you can configure the extension to use WSL:
 
 1. Open VS Code Settings (`Ctrl+,` or `Cmd+,`)
-2. Search for "Claude Code Chat"
+2. Search for "Chat Router"
 3. Configure these settings:
-   - **Claude Code Chat: WSL Enabled** - Enable WSL integration
-   - **Claude Code Chat: WSL Distro** - Your WSL distribution name (e.g., `Ubuntu`, `Debian`)
-   - **Claude Code Chat: WSL Node Path** - Path to Node.js in WSL (default: `/usr/bin/node`)
-   - **Claude Code Chat: WSL Claude Path** - Path to Claude in WSL (default: `/usr/local/bin/claude`)
+   - **Chat Router: WSL Enabled** - Enable WSL integration
+   - **Chat Router: WSL Distro** - Your WSL distribution name (e.g., `Ubuntu`, `Debian`)
+   - **Chat Router: WSL Node Path** - Path to Node.js in WSL (default: `/usr/bin/node`)
+   - **Chat Router: WSL Claude Path** - Path to Claude in WSL (default: `/usr/local/bin/claude`)
 
 Example configuration in `settings.json`:
 ```json
 {
-  "claudeCodeChat.wsl.enabled": true,
-  "claudeCodeChat.wsl.distro": "Ubuntu",
-  "claudeCodeChat.wsl.nodePath": "/usr/bin/node",
-  "claudeCodeChat.wsl.claudePath": "/usr/local/bin/claude"
+  "chatRouter.wsl.enabled": true,
+  "chatRouter.wsl.distro": "Ubuntu",
+  "chatRouter.wsl.nodePath": "/usr/bin/node",
+  "chatRouter.wsl.claudePath": "/usr/local/bin/claude"
 }
 ```
 
@@ -283,7 +283,7 @@ Example configuration in `settings.json`:
 ## 🔧 **Advanced Features**
 
 ### 🛠️ **Tool Integration**
-Claude Code Chat provides secure access to all Claude Code tools:
+Chat Router provides secure access to all Claude Code tools:
 - **Bash** - Execute shell commands with permission controls
 - **File Operations** - Read, write, and edit files
 - **Search** - Grep and glob pattern matching across workspace
@@ -321,8 +321,8 @@ We welcome contributions! Here's how you can help:
 
 ### Development Setup
 ```bash
-git clone https://github.com/andrepimenta/claude-code-chat
-cd claude-code-chat
+git clone https://github.com/andrepimenta/chat-router
+cd chat-router
 npm install
 
 Click "F5" to run the extension or access the "Run and Debug" section in VSCode
@@ -349,7 +349,7 @@ See the [LICENSE](LICENSE) file for details.
 Need help? We've got you covered:
 
 - 💬 **In-App** - Click "Support" in the status bar to send feedback directly
-- 🐛 **Issues**: [GitHub Issues](https://github.com/andrepimenta/claude-code-chat/issues)
+- 🐛 **Issues**: [GitHub Issues](https://github.com/andrepimenta/chat-router/issues)
 
 ---
 
@@ -357,6 +357,6 @@ Need help? We've got you covered:
 
 **⭐ Star us on GitHub if this project helped you!**
 
-[**Download Now**](https://marketplace.visualstudio.com/items?itemName=andrepimenta.claude-code-chat)
+[**Download Now**](https://marketplace.visualstudio.com/items?itemName=andrepimenta.chat-router)
 
 </div>

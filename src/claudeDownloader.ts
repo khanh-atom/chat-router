@@ -172,7 +172,7 @@ function _httpGet(urlStr: string, signal?: AbortSignal, redirectsRemaining = 5):
 		const parsed = new URL(urlStr);
 		// Pick http or https by scheme so tests can target a local http server.
 		const getter = parsed.protocol === 'http:' ? http.get : https.get;
-		const req = getter(urlStr, { headers: { 'user-agent': 'claude-code-chat-vscode' } }, (res) => {
+		const req = getter(urlStr, { headers: { 'user-agent': 'chat-router-vscode' } }, (res) => {
 			const status = res.statusCode ?? 0;
 			if ([301, 302, 303, 307, 308].includes(status) && res.headers.location) {
 				res.resume();
