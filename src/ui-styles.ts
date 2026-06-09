@@ -5491,6 +5491,371 @@ const styles = `
         box-shadow: none;
     }
 
+    .vibe-chat-box {
+        position: relative;
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        max-width: 860px;
+        align-self: center;
+        box-sizing: border-box;
+        overflow: visible;
+        border: 1px solid var(--vscode-panel-border);
+        border-radius: 4px;
+        background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+    }
+
+    .chatbox-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        min-height: 38px;
+        padding: 7px 8px;
+        border-bottom: 1px solid var(--vscode-panel-border);
+        box-sizing: border-box;
+    }
+
+    .chatbox-header-left,
+    .chatbox-header-right,
+    .chatbox-footer,
+    .left-controls,
+    .right-controls {
+        display: flex;
+        align-items: center;
+    }
+
+    .chatbox-header-left,
+    .left-controls {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .chatbox-header-left {
+        gap: 8px;
+    }
+
+    .chatbox-header-right {
+        flex-shrink: 0;
+        gap: 8px;
+    }
+
+    .agent-avatar {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 22px;
+        height: 22px;
+        flex: 0 0 auto;
+        border: 1px solid var(--vscode-panel-border);
+        border-radius: 50%;
+        background: var(--vscode-editor-background);
+        color: var(--vscode-foreground);
+        font-size: 9px;
+        font-weight: 700;
+        letter-spacing: 0;
+        line-height: 1;
+    }
+
+    .agent-avatar.cursor {
+        color: var(--vscode-textLink-foreground);
+    }
+
+    .toolbar-dropdown-wrapper {
+        position: relative;
+        display: inline-flex;
+        min-width: 0;
+    }
+
+    .toolbar-dropdown-btn,
+    .toolbar-icon-btn,
+    .input-dropdown-btn,
+    .model-selector-main,
+    .model-quick-btn,
+    .model-more-btn,
+    .input-toggle-btn {
+        height: 26px;
+        min-height: 26px;
+        box-sizing: border-box;
+        border: 1px solid var(--vscode-panel-border);
+        border-radius: 4px;
+        background: transparent;
+        color: var(--vscode-descriptionForeground);
+        font-family: var(--vscode-font-family);
+        font-size: 12px;
+        font-weight: 500;
+        letter-spacing: 0;
+        line-height: 1;
+        transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+    }
+
+    .toolbar-dropdown-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        max-width: 150px;
+        padding: 0 8px;
+        cursor: pointer;
+    }
+
+    .toolbar-dropdown-btn span {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .toolbar-icon-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 26px;
+        padding: 0;
+        cursor: pointer;
+    }
+
+    .toolbar-dropdown-btn:hover,
+    .toolbar-icon-btn:hover,
+    .input-dropdown-btn:hover,
+    .model-selector-main:hover,
+    .model-quick-btn:hover,
+    .model-more-btn:hover,
+    .input-toggle-btn:hover {
+        background: var(--vscode-list-hoverBackground);
+        border-color: var(--vscode-focusBorder);
+        color: var(--vscode-foreground);
+    }
+
+    .toolbar-menu {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0;
+        z-index: 1000;
+        min-width: 174px;
+        padding: 4px;
+        border: 1px solid var(--vscode-menu-border, var(--vscode-panel-border));
+        border-radius: 4px;
+        background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+    }
+
+    .chatbox-header-right .toolbar-menu {
+        left: auto;
+        right: 0;
+    }
+
+    .toolbar-menu-label,
+    .connect-menu-header {
+        padding: 6px 8px 4px;
+        color: var(--vscode-descriptionForeground);
+        font-size: 11px;
+        font-weight: 600;
+    }
+
+    .toolbar-menu-item,
+    .connect-menu-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        width: 100%;
+        min-height: 28px;
+        padding: 5px 8px;
+        border: 0;
+        border-radius: 4px;
+        background: transparent;
+        color: var(--vscode-foreground);
+        font-family: var(--vscode-font-family);
+        font-size: 12px;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    .toolbar-menu-item:hover,
+    .connect-menu-item:hover,
+    .toolbar-menu-item.selected {
+        background: var(--vscode-list-hoverBackground);
+    }
+
+    .toolbar-menu-check,
+    .toolbar-menu-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 14px;
+        height: 14px;
+        flex: 0 0 auto;
+        color: var(--vscode-foreground);
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .vibe-chat-box .textarea-container {
+        display: flex;
+        width: 100%;
+        max-width: none;
+        align-self: stretch;
+        box-sizing: border-box;
+        padding: 0;
+    }
+
+    .vibe-chat-box .textarea-wrapper {
+        width: 100%;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        box-shadow: none;
+    }
+
+    .vibe-chat-box .textarea-wrapper:focus-within {
+        border-color: transparent;
+        box-shadow: none;
+    }
+
+    .vibe-chat-box .input-field {
+        min-height: 84px;
+        max-height: 220px;
+        padding: 12px 12px 6px;
+        font-family: var(--vscode-font-family);
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .chatbox-footer {
+        justify-content: space-between;
+        gap: 10px;
+        min-height: 38px;
+        padding: 7px 8px 8px;
+        box-sizing: border-box;
+    }
+
+    .left-controls {
+        gap: 6px;
+        flex-wrap: wrap;
+    }
+
+    .right-controls {
+        flex-shrink: 0;
+        gap: 6px;
+        margin-left: auto;
+    }
+
+    .chatbox-footer .model-selector-row {
+        width: auto;
+        max-width: min(210px, 100%);
+        min-height: 26px;
+        flex: 0 1 auto;
+        align-self: auto;
+        margin: 0;
+        gap: 4px;
+    }
+
+    .chatbox-footer #modelQuickSelect,
+    .chatbox-footer #modelMoreBtn {
+        display: none;
+    }
+
+    .chatbox-footer .model-selector-main,
+    .chatbox-footer .input-dropdown-btn,
+    .chatbox-footer .input-toggle-btn {
+        padding: 0 8px;
+    }
+
+    .chatbox-footer .slash-btn,
+    .chatbox-footer .at-btn,
+    .chatbox-footer .image-btn {
+        width: 26px;
+        height: 26px;
+        min-height: 26px;
+        padding: 0;
+        border: 0;
+        font-weight: 600;
+    }
+
+    .chatbox-footer .image-btn svg {
+        display: block;
+    }
+
+    .connect-menu {
+        min-width: 176px;
+        padding: 4px;
+        border-radius: 4px;
+        background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+    }
+
+    .send-btn,
+    .stop-inline-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        height: 28px;
+        min-height: 28px;
+        padding: 0 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        font-weight: 600;
+        line-height: 1;
+    }
+
+    .send-btn {
+        background: var(--vscode-button-background);
+        color: var(--vscode-button-foreground);
+    }
+
+    .send-btn:hover {
+        background: var(--vscode-button-hoverBackground);
+    }
+
+    .stop-inline-btn {
+        border: 1px solid var(--vscode-panel-border);
+        background: var(--vscode-button-secondaryBackground, transparent);
+        color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+    }
+
+    @keyframes chatBorderFlash {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+    }
+
+    .chat-box-running::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+        pointer-events: none;
+        border-radius: 4px;
+        padding: 1px;
+        background: linear-gradient(45deg, transparent, var(--vscode-textLink-foreground), transparent);
+        background-size: 200% 100%;
+        animation: chatBorderFlash 2s linear infinite;
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+    }
+
+    @media (max-width: 420px) {
+        .chatbox-header {
+            align-items: flex-start;
+            flex-direction: column;
+        }
+
+        .chatbox-header-right {
+            width: 100%;
+            justify-content: flex-end;
+        }
+
+        .chatbox-footer {
+            align-items: stretch;
+            flex-direction: column;
+        }
+
+        .right-controls {
+            width: 100%;
+            justify-content: flex-end;
+        }
+    }
+
     /* Toast notifications */
     .toast-notification {
         position: fixed;

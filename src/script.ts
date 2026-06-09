@@ -1000,10 +1000,87 @@ const getScript = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'htt
 			if (menu) menu.style.display = 'none';
 		}
 
+		const agentDisplayConfig = {
+			claude: { label: 'Claude Code', avatar: 'CC' },
+			cursor: { label: 'Cursor Agent', avatar: 'CA' }
+		};
+
+		function updateAgentDisplay(agentType) {
+			const agent = agentDisplayConfig[agentType] ? agentType : 'claude';
+			const config = agentDisplayConfig[agent];
+			const label = document.getElementById('agentDropdownText');
+			const avatar = document.getElementById('agentAvatar');
+			if (label) label.textContent = config.label;
+			if (avatar) {
+				avatar.textContent = config.avatar;
+				avatar.classList.toggle('claude', agent === 'claude');
+				avatar.classList.toggle('cursor', agent === 'cursor');
+			}
+			document.querySelectorAll('[data-agent-option]').forEach(function(item) {
+				const isSelected = item.getAttribute('data-agent-option') === agent;
+				item.classList.toggle('selected', isSelected);
+				const check = item.querySelector('.toolbar-menu-check');
+				if (check) check.textContent = isSelected ? '✓' : '';
+			});
+		}
+
+		function toggleAgentMenu() {
+			var menu = document.getElementById('agentMenu');
+			if (!menu) return;
+			hideSessionMenu();
+			menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+		}
+
+		function hideAgentMenu() {
+			var menu = document.getElementById('agentMenu');
+			if (menu) menu.style.display = 'none';
+		}
+
+		function selectAgent(agentType) {
+			const agent = agentDisplayConfig[agentType] ? agentType : 'claude';
+			const agentSelect = document.getElementById('agent-type');
+			if (agentSelect) {
+				agentSelect.value = agent;
+			}
+			updateAgentDisplay(agent);
+			hideAgentMenu();
+			updateSettings();
+		}
+
+		function updateSessionDropdownLabel(label) {
+			const sessionText = document.getElementById('sessionDropdownText');
+			if (sessionText) sessionText.textContent = label;
+		}
+
+		function toggleSessionMenu() {
+			var menu = document.getElementById('sessionMenu');
+			if (!menu) return;
+			hideAgentMenu();
+			menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+		}
+
+		function hideSessionMenu() {
+			var menu = document.getElementById('sessionMenu');
+			if (menu) menu.style.display = 'none';
+		}
+
+		function setChatBoxRunning(running) {
+			const chatBox = document.getElementById('vibeChatBox');
+			if (chatBox) {
+				chatBox.classList.toggle('chat-box-running', !!running);
+			}
+		}
+
 		// Close connect menu when clicking outside
 		document.addEventListener('click', function(e) {
 			if (!e.target.closest('.connect-dropdown-wrapper')) {
 				hideConnectMenu();
+			}
+			if (!e.target.closest('.agent-dropdown-wrapper')) {
+				hideAgentMenu();
+			}
+			if (!e.target.closest('.session-dropdown-wrapper')) {
+				hideSessionMenu();
 			}
 		});
 
@@ -1051,11 +1128,13 @@ const getScript = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'htt
 		function updateStatus(text, state = 'ready') {
 			statusTextDiv.textContent = text;
 			statusDiv.className = \`status \${state}\`;
+			setChatBoxRunning(state === 'processing');
 		}
 
 		function updateStatusHtml(html, state = 'ready') {
 			statusTextDiv.innerHTML = html;
 			statusDiv.className = \`status \${state}\`;
+			setChatBoxRunning(state === 'processing');
 		}
 
 		function viewUsage(usageType) {
@@ -4368,6 +4447,7 @@ const getScript = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'htt
 				// sessionIdSpan.style.cursor = 'pointer';
 				// sessionIdSpan.onclick = () => copySessionId(sessionId);
 				// sessionInfo.style.display = 'flex';
+				updateSessionDropdownLabel('Latest');
 				sessionStatus.style.display = 'none';
 				newSessionBtn.style.display = 'block';
 				if (historyBtn) historyBtn.style.display = 'block';
@@ -4398,6 +4478,7 @@ const getScript = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'htt
 			
 			if (sessionStatus && newSessionBtn) {
 				// sessionInfo.style.display = 'none';
+				updateSessionDropdownLabel('New Chat');
 				sessionStatus.style.display = 'none';
 
 				// Always show new session
@@ -4875,6 +4956,7 @@ const getScript = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'htt
 			// Update WSL options visibility
 			document.getElementById('wslOptions').style.display = wslEnabled ? 'block' : 'none';
 			updateAgentSettingsVisibility();
+			updateAgentDisplay(agentType);
 
 			// Update OpenCredits state from current env vars
 			const baseUrl = envVariables['ANTHROPIC_BASE_URL'] || '';
@@ -5202,6 +5284,7 @@ const getScript = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'htt
 				if (agentSelect) {
 					agentSelect.value = message.data['agent'] || 'claude';
 				}
+				updateAgentDisplay(message.data['agent'] || 'claude');
 				document.getElementById('wsl-enabled').checked = message.data['wsl.enabled'] || false;
 				document.getElementById('wsl-distro').value = message.data['wsl.distro'] || 'Ubuntu';
 				document.getElementById('wsl-node-path').value = message.data['wsl.nodePath'] ?? '';

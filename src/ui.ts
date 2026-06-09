@@ -19,20 +19,7 @@ const getHtml = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'https
 </head>
 <body>
 	<div class="header">
-		<div style="display: flex; align-items: center;">
-			<h2>Chat Router</h2>
-			<!-- <div id="sessionInfo" class="session-badge" style="display: none;">
-				<span class="session-icon">💬</span>
-				<span id="sessionId">-</span>
-				<span class="session-label">session</span>
-			</div> -->
-		</div>
-		<div style="display: flex; gap: 8px; align-items: center;">
-			<div id="sessionStatus" class="session-status" style="display: none;">No session</div>
-			<button class="btn outlined" id="settingsBtn" onclick="toggleSettings()" title="Settings">⚙️</button>
-			<button class="btn outlined" id="historyBtn" onclick="toggleConversationHistory()">📚 History</button>
-			<button class="btn primary" id="newSessionBtn" onclick="newSession()">New Chat</button>
-		</div>
+		<h2>Chat Router</h2>
 	</div>
 	
 	<div id="conversationHistory" class="conversation-history" style="display: none;">
@@ -64,80 +51,122 @@ const getHtml = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'https
 		</div>
 		
 		<div class="input-container" id="inputContainer">
-			<div class="model-selector-row">
-				<button class="model-selector-main" id="modelDropdownBtn" onclick="showModelSelector()" title="Select model">
-					<span id="modelDropdownText">Opus</span>
-					<svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor"><path d="M1 2.5l3 3 3-3"></path></svg>
-				</button>
-				<button class="model-selector-main" id="modelSelector" onclick="showModelSelector()" title="Select model" style="display: none;">
-					<span class="model-selector-new" id="modelSelectorBadge">NEW</span>
-					<span id="modelSelectorText">Try other models</span>
-				</button>
-				<div class="model-quick-select" id="modelQuickSelect">
-				</div>
-				<button class="model-more-btn" id="modelMoreBtn" onclick="showModelSelector()" style="display: none;">+</button>
-			</div>
-			<div class="textarea-container">
-				<div class="textarea-wrapper">
-					<div class="image-preview-container" id="imagePreviewContainer" style="display: none;"></div>
-					<textarea class="input-field" id="messageInput" placeholder="Continue working on this task..." rows="1"></textarea>
-					<div class="input-controls">
-						<div class="left-controls">
-							<div class="connect-dropdown-wrapper">
-								<button class="input-dropdown-btn" id="connectBtn" onclick="toggleConnectMenu()">
-									<span>Add</span>
-									<svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor"><path d="M1 2.5l3 3 3-3"></path></svg>
+			<div class="vibe-chat-box" id="vibeChatBox">
+				<div class="chatbox-header">
+					<div class="chatbox-header-left">
+						<span class="agent-avatar claude" id="agentAvatar">CC</span>
+						<div class="toolbar-dropdown-wrapper agent-dropdown-wrapper">
+							<button class="toolbar-dropdown-btn" id="agentDropdownBtn" onclick="toggleAgentMenu()" title="Select agent">
+								<span id="agentDropdownText">Claude Code</span>
+								<svg width="10" height="10" viewBox="0 0 8 8" fill="currentColor"><path d="M1 2.5l3 3 3-3"></path></svg>
+							</button>
+							<div class="toolbar-menu" id="agentMenu" style="display: none;">
+								<div class="toolbar-menu-label">Executors</div>
+								<button class="toolbar-menu-item" data-agent-option="claude" onclick="selectAgent('claude')">
+									<span class="toolbar-menu-check"></span>
+									<span>Claude Code</span>
 								</button>
-								<div class="connect-menu" id="connectMenu" style="display: none;">
-									<div class="connect-menu-header">Add</div>
-									<button class="connect-menu-item" onclick="hideConnectMenu(); showPluginsModal();">
-										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-										<span>Plugins</span>
-									</button>
-									<button class="connect-menu-item" onclick="hideConnectMenu(); showSkillsModal();">
-										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-										<span>Skills</span>
-									</button>
-									<button class="connect-menu-item" onclick="hideConnectMenu(); showMCPModal();">
-										<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1" fill="currentColor"/><circle cx="6" cy="18" r="1" fill="currentColor"/></svg>
-										<span>MCP Servers</span>
-									</button>
-								</div>
+								<button class="toolbar-menu-item" data-agent-option="cursor" onclick="selectAgent('cursor')">
+									<span class="toolbar-menu-check"></span>
+									<span>Cursor Agent</span>
+								</button>
 							</div>
-							<button class="input-toggle-btn" id="planToggleBtn" onclick="cyclePlanMode()">Plan</button>
-							<button class="input-toggle-btn" id="thinkToggleBtn" onclick="toggleThinkingMode()">Ultrathink</button>
 						</div>
-						<div class="right-controls">
-							<button class="slash-btn" onclick="showSlashCommandsModal()" title="Slash commands">/</button>
-							<button class="at-btn" onclick="showFilePicker()" title="Reference files">@</button>
-							<button class="image-btn" id="imageBtn" onclick="selectImage()" title="Attach images">
-							<svg
-								xmlns="http://www.w3.org/2000/svg"
-								viewBox="0 0 16 16"
-								width="14"
-								height="16"
-								>
+						<div id="sessionStatus" class="session-status" style="display: none;">No session</div>
+					</div>
+					<div class="chatbox-header-right">
+						<button class="toolbar-icon-btn" id="settingsBtn" onclick="toggleSettings()" title="Settings" aria-label="Settings">
+							<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.04.04a2 2 0 0 1-2.83 2.83l-.04-.04a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 0 1-4 0v-.06a1.7 1.7 0 0 0-1.03-1.56 1.7 1.7 0 0 0-1.88.34l-.04.04a2 2 0 0 1-2.83-2.83l.04-.04A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 0 1 0-4h.06A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88l-.04-.04a2 2 0 0 1 2.83-2.83l.04.04a1.7 1.7 0 0 0 1.88.34A1.7 1.7 0 0 0 10 3.06V3a2 2 0 0 1 4 0v.06a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.04-.04a2 2 0 0 1 2.83 2.83l-.04.04a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 20.94 10H21a2 2 0 0 1 0 4h-.06A1.7 1.7 0 0 0 19.4 15Z"/></svg>
+						</button>
+						<div class="toolbar-dropdown-wrapper session-dropdown-wrapper">
+							<button class="toolbar-dropdown-btn session-dropdown-btn" id="sessionDropdownBtn" onclick="toggleSessionMenu()" title="Session actions">
+								<span id="sessionDropdownText">New Chat</span>
+								<svg width="10" height="10" viewBox="0 0 8 8" fill="currentColor"><path d="M1 2.5l3 3 3-3"></path></svg>
+							</button>
+							<div class="toolbar-menu session-menu" id="sessionMenu" style="display: none;">
+								<div class="toolbar-menu-label">Session</div>
+								<button class="toolbar-menu-item" id="newSessionBtn" onclick="hideSessionMenu(); newSession()">
+									<span class="toolbar-menu-icon">+</span>
+									<span>New Chat</span>
+								</button>
+								<button class="toolbar-menu-item" id="historyBtn" onclick="hideSessionMenu(); toggleConversationHistory()">
+									<span class="toolbar-menu-icon">
+										<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v6h6"/><path d="M12 7v5l3 2"/></svg>
+									</span>
+									<span>History</span>
+								</button>
+							</div>
+						</div>
+					</div>
+				</div>
+				<div class="textarea-container">
+					<div class="textarea-wrapper">
+						<div class="image-preview-container" id="imagePreviewContainer" style="display: none;"></div>
+						<textarea class="input-field" id="messageInput" placeholder="Continue working on this task..." rows="1"></textarea>
+					</div>
+				</div>
+				<div class="chatbox-footer">
+					<div class="left-controls">
+						<div class="model-selector-row">
+							<button class="model-selector-main" id="modelDropdownBtn" onclick="showModelSelector()" title="Select model">
+								<span id="modelDropdownText">Opus</span>
+								<svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor"><path d="M1 2.5l3 3 3-3"></path></svg>
+							</button>
+							<button class="model-selector-main" id="modelSelector" onclick="showModelSelector()" title="Select model" style="display: none;">
+								<span class="model-selector-new" id="modelSelectorBadge">NEW</span>
+								<span id="modelSelectorText">Try other models</span>
+							</button>
+							<div class="model-quick-select" id="modelQuickSelect">
+							</div>
+							<button class="model-more-btn" id="modelMoreBtn" onclick="showModelSelector()" style="display: none;">+</button>
+						</div>
+						<div class="connect-dropdown-wrapper">
+							<button class="input-dropdown-btn" id="connectBtn" onclick="toggleConnectMenu()">
+								<span>Add</span>
+								<svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor"><path d="M1 2.5l3 3 3-3"></path></svg>
+							</button>
+							<div class="connect-menu" id="connectMenu" style="display: none;">
+								<div class="connect-menu-header">Add</div>
+								<button class="connect-menu-item" onclick="hideConnectMenu(); showPluginsModal();">
+									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+									<span>Plugins</span>
+								</button>
+								<button class="connect-menu-item" onclick="hideConnectMenu(); showSkillsModal();">
+									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+									<span>Skills</span>
+								</button>
+								<button class="connect-menu-item" onclick="hideConnectMenu(); showMCPModal();">
+									<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1" fill="currentColor"/><circle cx="6" cy="18" r="1" fill="currentColor"/></svg>
+									<span>MCP Servers</span>
+								</button>
+							</div>
+						</div>
+						<button class="toolbar-icon-btn slash-btn" onclick="showSlashCommandsModal()" title="Slash commands" aria-label="Slash commands">/</button>
+						<button class="toolbar-icon-btn at-btn" onclick="showFilePicker()" title="Reference files" aria-label="Reference files">@</button>
+						<button class="toolbar-icon-btn image-btn" id="imageBtn" onclick="selectImage()" title="Attach images" aria-label="Attach images">
+							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="14" height="14">
 								<g fill="currentColor">
 									<path d="M6.002 5.5a1.5 1.5 0 1 1-3 0a1.5 1.5 0 0 1 3 0"></path>
 									<path d="M1.5 2A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h13a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2zm13 1a.5.5 0 0 1 .5.5v6l-3.775-1.947a.5.5 0 0 0-.577.093l-3.71 3.71l-2.66-1.772a.5.5 0 0 0-.63.062L1.002 12v.54L1 12.5v-9a.5.5 0 0 1 .5-.5z"></path>
 								</g>
 							</svg>
-							</button>
-							<button class="send-btn" id="sendBtn" onclick="sendMessage()">
-								<div>
-								<span>Send </span>
-								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="11" height="11">
-									<path fill="currentColor" d="M20 4v9a4 4 0 0 1-4 4H6.914l2.5 2.5L8 20.914L3.086 16L8 11.086L9.414 12.5l-2.5 2.5H16a2 2 0 0 0 2-2V4z"></path>
-								</svg>
-								</div>
-							</button>
-							<button class="stop-inline-btn" id="stopInlineBtn" onclick="stopRequest()" style="display: none;">
-								<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
-									<path d="M6 6h12v12H6z"/>
-								</svg>
-								Stop
-							</button>
-						</div>
+						</button>
+						<button class="input-toggle-btn" id="planToggleBtn" onclick="cyclePlanMode()">Plan</button>
+						<button class="input-toggle-btn" id="thinkToggleBtn" onclick="toggleThinkingMode()">Ultrathink</button>
+					</div>
+					<div class="right-controls">
+						<button class="send-btn" id="sendBtn" onclick="sendMessage()">
+							<span>Send</span>
+							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12">
+								<path fill="currentColor" d="M12 4l7 7l-1.4 1.4L13 7.8V20h-2V7.8l-4.6 4.6L5 11z"></path>
+							</svg>
+						</button>
+						<button class="stop-inline-btn" id="stopInlineBtn" onclick="stopRequest()" style="display: none;">
+							<svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor">
+								<path d="M6 6h12v12H6z"/>
+							</svg>
+							Stop
+						</button>
 					</div>
 				</div>
 			</div>
