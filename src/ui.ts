@@ -80,7 +80,7 @@ const getHtml = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'https
 			<div class="textarea-container">
 				<div class="textarea-wrapper">
 					<div class="image-preview-container" id="imagePreviewContainer" style="display: none;"></div>
-					<textarea class="input-field" id="messageInput" placeholder="Type your message to Claude Code..." rows="1"></textarea>
+					<textarea class="input-field" id="messageInput" placeholder="Continue working on this task..." rows="1"></textarea>
 					<div class="input-controls">
 						<div class="left-controls">
 							<div class="connect-dropdown-wrapper">

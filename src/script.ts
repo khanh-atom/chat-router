@@ -122,8 +122,8 @@ const getScript = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'htt
 			const messageDiv = document.createElement('div');
 			messageDiv.className = \`message \${type}\`;
 			
-			// Add header for main message types (excluding system)
-			if (type === 'user' || type === 'claude' || type === 'error') {
+			// Vibe Kanban-style transcript: only user messages get a framed title row.
+			if (type === 'user') {
 				const headerDiv = document.createElement('div');
 				headerDiv.className = 'message-header';
 				
