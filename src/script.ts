@@ -1045,6 +1045,23 @@ const getScript = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'htt
 			updateAgentDisplay(agent);
 			hideAgentMenu();
 			updateSettings();
+
+			// Update model dropdown text based on agent
+			const modelDropdown = document.getElementById('modelDropdownText');
+			if (modelDropdown) {
+				if (agent === 'cursor') {
+					const cursorModelInput = document.getElementById('cursor-model');
+					const cursorModelVal = (cursorModelInput && cursorModelInput.value) || '';
+					if (cursorModelVal) {
+						const matched = cursorModels.find(function(m) { return m.id === cursorModelVal; });
+						modelDropdown.textContent = matched ? matched.name : cursorModelVal;
+					} else {
+						modelDropdown.textContent = 'Auto';
+					}
+				} else {
+					updateCurrentModelDisplay();
+				}
+			}
 		}
 
 		function updateSessionDropdownLabel(label) {
@@ -2199,6 +2216,41 @@ const getScript = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'htt
 		let openCreditsBalance = null; // OpenCredits account balance
 		let envsDisabled = false; // Whether custom env vars are disabled
 		let opencreditsEnabled = false; // Feature flag: whether OpenCredits is available in this region
+
+		// Cursor Agent models - matches cursor-agent CLI available models
+		const cursorModels = [
+			{ id: 'auto', name: 'Auto' },
+			{ id: 'gpt-5.4', name: 'GPT-5.4' },
+			{ id: 'gpt-5.4-fast', name: 'GPT-5.4 Fast' },
+			{ id: 'gemini-3.1-pro', name: 'Gemini 3.1 Pro' },
+			{ id: 'opus-4.6', name: 'Claude 4.6 Opus' },
+			{ id: 'sonnet-4.6', name: 'Claude 4.6 Sonnet' },
+			{ id: 'gpt-5.3-codex', name: 'GPT-5.3 Codex' },
+			{ id: 'gpt-5.3-codex-fast', name: 'GPT-5.3 Codex Fast' },
+			{ id: 'gpt-5.3-codex-spark-preview', name: 'GPT-5.3 Codex Spark' },
+			{ id: 'kimi-k2.5', name: 'Kimi K2.5' },
+			{ id: 'opus-4.5', name: 'Claude 4.5 Opus' },
+			{ id: 'sonnet-4.5', name: 'Claude 4.5 Sonnet' },
+			{ id: 'gemini-3-pro', name: 'Gemini 3 Pro' },
+			{ id: 'gemini-3-flash', name: 'Gemini 3 Flash' },
+			{ id: 'gpt-5.2-codex', name: 'GPT-5.2 Codex' },
+			{ id: 'gpt-5.2-codex-fast', name: 'GPT-5.2 Codex Fast' },
+			{ id: 'gpt-5.2', name: 'GPT-5.2' },
+			{ id: 'gpt-5.1-codex-max', name: 'GPT-5.1 Codex Max' },
+			{ id: 'gpt-5.1', name: 'GPT-5.1' },
+			{ id: 'gpt-5.1-codex-mini', name: 'GPT-5.1 Codex Mini' },
+			{ id: 'grok', name: 'Grok' },
+			{ id: 'composer-1', name: 'Composer 1' },
+			{ id: 'composer-1.5', name: 'Composer 1.5' },
+			{ id: 'composer-2', name: 'Composer 2' },
+			{ id: 'composer-2-fast', name: 'Composer 2 Fast' }
+		];
+
+		// Helper to get current agent type from settings
+		function getCurrentAgentType() {
+			const agentSelect = document.getElementById('agent-type');
+			return (agentSelect && agentSelect.value) || 'claude';
+		}
 		let hasSavedOpenCreditsKey = false; // Whether a key exists in encrypted storage
 
 		// Recommended alternative models - loaded from recommended-models.json via window.__recommendedModels
@@ -2492,23 +2544,94 @@ const getScript = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'htt
 
 			const opencreditsSection = document.getElementById('opencreditsModelsSection');
 			const claudeSection = document.getElementById('claudeCodeSection');
+			const cursorSection = document.getElementById('cursorModelsSection');
 			const divider = document.getElementById('modelSectionDivider');
+			const isCursor = getCurrentAgentType() === 'cursor';
 
-			// Always show Claude Code section
-			claudeSection.style.display = 'block';
-
-			// Show OpenCredits section only if feature flag enabled
-			if (opencreditsEnabled || hasOpenCreditsKey) {
-				opencreditsSection.style.display = 'block';
-				divider.style.display = 'block';
+			if (isCursor) {
+				// Show Cursor models, hide Claude/OpenCredits sections
+				claudeSection.style.display = 'none';
+				if (opencreditsSection) opencreditsSection.style.display = 'none';
+				if (divider) divider.style.display = 'none';
+				if (cursorSection) {
+					cursorSection.style.display = 'block';
+					renderCursorModelCards();
+				}
 			} else {
-				opencreditsSection.style.display = 'none';
-				divider.style.display = 'none';
+				// Show Claude Code section, hide Cursor section
+				claudeSection.style.display = 'block';
+				if (cursorSection) cursorSection.style.display = 'none';
+
+				// Show OpenCredits section only if feature flag enabled
+				if (opencreditsEnabled || hasOpenCreditsKey) {
+					opencreditsSection.style.display = 'block';
+					divider.style.display = 'block';
+				} else {
+					opencreditsSection.style.display = 'none';
+					divider.style.display = 'none';
+				}
+				renderOpenCreditsModelCards();
 			}
-			renderOpenCreditsModelCards();
 
 			// Update selected state
 			updateModelSelection();
+		}
+
+		// Render Cursor Agent model cards
+		function renderCursorModelCards() {
+			const container = document.getElementById('cursorModelCards');
+			if (!container) return;
+
+			// Get current cursor model from settings input
+			const cursorModelInput = document.getElementById('cursor-model');
+			const currentCursorModel = (cursorModelInput && cursorModelInput.value) || 'auto';
+
+			container.innerHTML = cursorModels.map(function(model) {
+				const isSelected = currentCursorModel === model.id;
+				return '<div class="claude-card' + (isSelected ? ' selected' : '') + '" data-cursor-model="' + model.id + '">' +
+					'<div class="claude-card-name">' + model.name + '</div>' +
+					'<div class="claude-card-desc">' + model.id + '</div>' +
+				'</div>';
+			}).join('');
+
+			// Add click handlers
+			container.querySelectorAll('[data-cursor-model]').forEach(function(card) {
+				card.addEventListener('click', function() {
+					selectCursorModel(card.getAttribute('data-cursor-model'));
+				});
+			});
+		}
+
+		// Select a Cursor Agent model
+		function selectCursorModel(modelId) {
+			// Update the cursor model setting input
+			const cursorModelInput = document.getElementById('cursor-model');
+			if (cursorModelInput) {
+				cursorModelInput.value = modelId === 'auto' ? '' : modelId;
+			}
+
+			// Update the model dropdown text
+			const modelDropdown = document.getElementById('modelDropdownText');
+			if (modelDropdown) {
+				const model = cursorModels.find(function(m) { return m.id === modelId; });
+				modelDropdown.textContent = model ? model.name : modelId;
+			}
+
+			// Update card selection
+			document.querySelectorAll('[data-cursor-model]').forEach(function(card) {
+				card.classList.toggle('selected', card.getAttribute('data-cursor-model') === modelId);
+			});
+
+			// Save via settings update
+			vscode.postMessage({
+				type: 'updateSettings',
+				settings: {
+					'cursor.model': modelId === 'auto' ? '' : modelId
+				}
+			});
+
+			sendStats('Cursor model selected', { model: modelId });
+			hideModelModal();
 		}
 
 		function updateModelSelection() {
@@ -5317,6 +5440,19 @@ const getScript = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'htt
 				const cursorModel = document.getElementById('cursor-model');
 				if (cursorModel) {
 					cursorModel.value = message.data['cursor.model'] || '';
+				}
+				// Update model dropdown text for cursor agent
+				if ((message.data['agent'] || 'claude') === 'cursor') {
+					const cursorModelVal = message.data['cursor.model'] || '';
+					const modelDropdown = document.getElementById('modelDropdownText');
+					if (modelDropdown) {
+						if (cursorModelVal) {
+							const matched = cursorModels.find(function(m) { return m.id === cursorModelVal; });
+							modelDropdown.textContent = matched ? matched.name : cursorModelVal;
+						} else {
+							modelDropdown.textContent = 'Auto';
+						}
+					}
 				}
 				const cursorForce = document.getElementById('cursor-force');
 				if (cursorForce) {

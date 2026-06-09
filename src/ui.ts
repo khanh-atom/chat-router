@@ -513,6 +513,16 @@ const getHtml = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'https
 				</div>
 			</div>
 
+			<!-- Cursor Agent models section (shown when agent is cursor) -->
+			<div id="cursorModelsSection" class="model-section" style="display: none;">
+				<div class="model-section-header">
+					<span class="model-section-title">CURSOR AGENT MODELS</span>
+				</div>
+				<div class="claude-cards-container" id="cursorModelCards">
+					<!-- Cards populated by JavaScript -->
+				</div>
+			</div>
+
 			<!-- Divider (only shown when both sections visible) -->
 			<div id="modelSectionDivider" class="model-section-divider" style="display: none;"></div>
 
