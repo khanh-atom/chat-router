@@ -291,8 +291,8 @@ const getHtml = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'https
 				<h3 style="margin-top: 0; margin-bottom: 16px; font-size: 14px; font-weight: 600;">WSL Configuration</h3>
 				<div>
 					<p style="font-size: 11px; color: var(--vscode-descriptionForeground); margin: 0;">
-						WSL integration allows you to run Claude Code from within Windows Subsystem for Linux.
-						This is useful if you have Claude installed in WSL instead of Windows.
+						WSL integration allows you to run your selected agent from within Windows Subsystem for Linux.
+						This is useful if you have the CLI installed in WSL instead of Windows.
 					</p>
 				</div>
 				<div class="settings-group">
@@ -312,6 +312,14 @@ const getHtml = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'https
 							<input type="text" id="wsl-claude-path" class="file-search-input" style="width: 100%;" placeholder="/usr/local/bin/claude" onchange="updateSettings()">
 							<p style="font-size: 11px; color: var(--vscode-descriptionForeground); margin: 4px 0 0 0;">
 								Find your claude installation path in WSL by running: <code style="background: var(--vscode-textCodeBlock-background); padding: 2px 4px; border-radius: 3px;">which claude</code>
+							</p>
+						</div>
+
+						<div style="margin-bottom: 12px;">
+							<label style="display: block; margin-bottom: 4px; font-size: 12px; color: var(--vscode-descriptionForeground);">Cursor Agent Path in WSL</label>
+							<input type="text" id="wsl-cursor-path" class="file-search-input" style="width: 100%;" placeholder="/usr/local/bin/cursor-agent" onchange="updateSettings()">
+							<p style="font-size: 11px; color: var(--vscode-descriptionForeground); margin: 4px 0 0 0;">
+								Find your Cursor Agent CLI path in WSL by running: <code style="background: var(--vscode-textCodeBlock-background); padding: 2px 4px; border-radius: 3px;">which cursor-agent</code>
 							</p>
 						</div>
 
@@ -372,20 +380,49 @@ const getHtml = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'https
 					</div>
 				</div>
 
-				<h3 style="margin-top: 24px; margin-bottom: 16px; font-size: 14px; font-weight: 600;">Customize Claude Command</h3>
+				<h3 style="margin-top: 24px; margin-bottom: 16px; font-size: 14px; font-weight: 600;">Agent Command</h3>
 				<div>
 					<p style="font-size: 11px; color: var(--vscode-descriptionForeground); margin: 0 0 12px 0;">
-						Customize the Claude Code executable and environment.
+						Choose the CLI Chat Router should run and customize its executable and environment.
 					</p>
 					<div id="opencreditsPromo" style="margin-bottom: 16px; padding: 14px 16px; border-radius: 8px; border: 1px solid var(--vscode-panel-border); background: rgba(139, 92, 246, 0.05);"></div>
 				</div>
 				<div class="settings-group">
+					<div style="margin-bottom: 16px;">
+						<label style="display: block; margin-bottom: 4px; font-size: 12px; color: var(--vscode-descriptionForeground);">Agent</label>
+						<select id="agent-type" class="file-search-input" style="width: 100%;" onchange="updateSettings(); updateAgentSettingsVisibility();">
+							<option value="claude">Claude Code</option>
+							<option value="cursor">Cursor Agent CLI</option>
+						</select>
+					</div>
+
 					<div style="margin-bottom: 16px;">
 						<label style="display: block; margin-bottom: 4px; font-size: 12px; color: var(--vscode-descriptionForeground);">Executable Path</label>
 						<input type="text" id="executable-path" class="file-search-input" style="width: 100%;" placeholder="claude (default)" onchange="updateSettings()">
 						<p style="font-size: 11px; color: var(--vscode-descriptionForeground); margin: 4px 0 0 0;">
 							Custom path to the Claude Code executable. Leave empty to use the default <code style="background: var(--vscode-textCodeBlock-background); padding: 2px 4px; border-radius: 3px;">claude</code> command.
 						</p>
+					</div>
+
+					<div id="cursorCommandSettings" style="margin-bottom: 16px; display: none;">
+						<div style="margin-bottom: 12px;">
+							<label style="display: block; margin-bottom: 4px; font-size: 12px; color: var(--vscode-descriptionForeground);">Cursor Executable Path</label>
+							<input type="text" id="cursor-executable-path" class="file-search-input" style="width: 100%;" placeholder="cursor-agent (default)" onchange="updateSettings()">
+							<p style="font-size: 11px; color: var(--vscode-descriptionForeground); margin: 4px 0 0 0;">
+								Custom path to Cursor Agent CLI. Leave empty to use the default <code style="background: var(--vscode-textCodeBlock-background); padding: 2px 4px; border-radius: 3px;">cursor-agent</code> command.
+							</p>
+						</div>
+						<div style="margin-bottom: 12px;">
+							<label style="display: block; margin-bottom: 4px; font-size: 12px; color: var(--vscode-descriptionForeground);">Cursor Model</label>
+							<input type="text" id="cursor-model" class="file-search-input" style="width: 100%;" placeholder="auto" onchange="updateSettings()">
+							<p style="font-size: 11px; color: var(--vscode-descriptionForeground); margin: 4px 0 0 0;">
+								Optional value passed to <code style="background: var(--vscode-textCodeBlock-background); padding: 2px 4px; border-radius: 3px;">--model</code>.
+							</p>
+						</div>
+						<div class="tool-item">
+							<input type="checkbox" id="cursor-force" onchange="updateSettings()">
+							<label for="cursor-force">Run Cursor with --force</label>
+						</div>
 					</div>
 
 					<div>

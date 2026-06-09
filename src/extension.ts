@@ -54,8 +54,10 @@ export function activate(context: vscode.ExtensionContext) {
 
 	// Listen for configuration changes
 	const configChangeDisposable = vscode.workspace.onDidChangeConfiguration(event => {
-		if (event.affectsConfiguration('chatRouter.wsl')) {
-			provider.newSessionOnConfigChange();
+		if (event.affectsConfiguration('chatRouter.wsl') || event.affectsConfiguration('chatRouter.agent')) {
+			provider.newSessionOnConfigChange(
+				event.affectsConfiguration('chatRouter.agent') ? 'Agent configuration changed' : 'WSL configuration changed'
+			);
 		}
 	});
 
@@ -107,6 +109,7 @@ export function deactivate() {
 }
 
 interface ConversationData {
+	agent?: AgentType;
 	sessionId: string;
 	startTime: string | undefined;
 	endTime: string;
@@ -118,6 +121,16 @@ interface ConversationData {
 	};
 	messages: Array<{ timestamp: string, messageType: string, data: any }>;
 	filename: string;
+}
+
+type AgentType = 'claude' | 'cursor';
+
+interface CursorToolState {
+	toolName: string;
+	rawInput: any;
+	fileContentBefore?: string;
+	startLine?: number;
+	startLines?: number[];
 }
 
 class ClaudeChatWebviewProvider implements vscode.WebviewViewProvider {
@@ -185,6 +198,7 @@ class ClaudeChatProvider {
 	private _conversationIndex: Array<{
 		filename: string,
 		sessionId: string,
+		agent?: AgentType,
 		startTime: string,
 		endTime: string,
 		messageCount: number,
@@ -196,6 +210,10 @@ class ClaudeChatProvider {
 	private _abortController: AbortController | undefined;
 	private _isWslProcess: boolean = false;
 	private _wslDistro: string = 'Ubuntu';
+	private _wslProcessName: string = 'claude';
+	private _cursorAssistantBuffer: string = '';
+	private _cursorThinkingBuffer: string = '';
+	private _cursorToolCalls: Map<string, CursorToolState> = new Map();
 	private _selectedModel: string = 'default'; // Default model
 	private _isProcessing: boolean | undefined;
 	private _draftMessage: string = '';
@@ -293,6 +311,42 @@ class ClaudeChatProvider {
 		return baseUrl.includes('opencredits.ai') || baseUrl.includes('localhost:8787');
 	}
 
+	private _getAgentType(): AgentType {
+		const config = vscode.workspace.getConfiguration('chatRouter');
+		const agent = config.get<string>('agent', 'claude');
+		return agent === 'cursor' ? 'cursor' : 'claude';
+	}
+
+	private _getAgentLabel(agent: AgentType = this._getAgentType()): string {
+		return agent === 'cursor' ? 'Cursor Agent CLI' : 'Claude Code';
+	}
+
+	private _getAgentProcessName(agent: AgentType = this._getAgentType()): string {
+		return agent === 'cursor' ? 'cursor-agent' : 'claude';
+	}
+
+	private _getNativeAgentExecutable(agent: AgentType = this._getAgentType()): string {
+		const config = vscode.workspace.getConfiguration('chatRouter');
+		if (agent === 'cursor') {
+			return (config.get<string>('cursor.executable.path', '') || '').trim() || 'cursor-agent';
+		}
+		return (config.get<string>('executable.path', '') || '').trim() || 'claude';
+	}
+
+	private _getWslAgentExecutable(agent: AgentType = this._getAgentType()): string {
+		const config = vscode.workspace.getConfiguration('chatRouter');
+		if (agent === 'cursor') {
+			return config.get<string>('wsl.cursorPath', '/usr/local/bin/cursor-agent');
+		}
+		return config.get<string>('wsl.claudePath', '/usr/local/bin/claude');
+	}
+
+	private _isLikelyCommandNotFound(message: string): boolean {
+		return message.includes('ENOENT') ||
+			message.includes('command not found') ||
+			message.includes('not recognized as an internal or external command');
+	}
+
 	private async _setEnvsDisabled(disabled: boolean): Promise<void> {
 		const config = vscode.workspace.getConfiguration('chatRouter');
 		await config.update('environment.disabled', disabled, vscode.ConfigurationTarget.Global);
@@ -372,6 +426,7 @@ class ClaudeChatProvider {
 	}
 
 	private _sendReadyMessage() {
+		const agentLabel = this._getAgentLabel();
 		// Send current session info if available
 		/*if (this._currentSessionId) {
 			this._postMessage({
@@ -384,7 +439,7 @@ class ClaudeChatProvider {
 
 		this._postMessage({
 			type: 'ready',
-			data: this._isProcessing ? 'Claude is working...' : 'Ready to chat with Claude Code! Type your message below.'
+			data: this._isProcessing ? `${agentLabel} is working...` : `Ready to chat with ${agentLabel}! Type your message below.`
 		});
 
 		// Send current model to webview
@@ -862,6 +917,8 @@ class ClaudeChatProvider {
 	private async _sendMessageToClaude(message: string, planMode?: boolean, thinkingMode?: boolean, images?: string[]) {
 		const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
 		const cwd = workspaceFolder ? workspaceFolder.uri.fsPath : process.cwd();
+		const agent = this._getAgentType();
+		const agentLabel = this._getAgentLabel(agent);
 
 		// Get thinking intensity setting
 		const configThink = vscode.workspace.getConfiguration('chatRouter');
@@ -919,73 +976,99 @@ class ClaudeChatProvider {
 		// Show loading indicator
 		this._postMessage({
 			type: 'loading',
-			data: 'Claude is working...'
+			data: `${agentLabel} is working...`
 		});
-
-		// Build command arguments with session management
-		// Use stream-json for both input and output to enable bidirectional communication
-		// This is required for stdio-based permission prompts
-		const args = [
-			'--output-format', 'stream-json',
-			'--input-format', 'stream-json',
-			'--verbose'
-		];
 
 		// Get configuration
 		const config = vscode.workspace.getConfiguration('chatRouter');
 		const yoloMode = config.get<boolean>('permissions.yoloMode', false);
+		let args: string[];
 
-		if (yoloMode) {
-			// Yolo mode: skip all permissions
-			args.push('--dangerously-skip-permissions');
-		} else {
-			// Use stdio-based permission prompts (no MCP server needed)
-			args.push('--permission-prompt-tool', 'stdio');
-		}
+		if (agent === 'cursor') {
+			args = ['-p', '--output-format=stream-json'];
 
-		// Pass extension's MCP config to Claude CLI (only if file exists)
-		const mcpConfigPath = this._getExtensionMCPConfigPath();
-		if (mcpConfigPath) {
-			try {
-				await vscode.workspace.fs.stat(vscode.Uri.file(mcpConfigPath));
-				args.push('--mcp-config', this.convertToWSLPath(mcpConfigPath));
-			} catch {
-				// File doesn't exist, skip --mcp-config
+			if (config.get<boolean>('cursor.force', false) || yoloMode) {
+				args.push('--force');
+			} else {
+				// Cursor requires explicit workspace trust for unattended CLI runs.
+				args.push('--trust');
 			}
-		}
 
-		// Add plan mode if enabled
-		if (planMode) {
-			args.push('--permission-mode', 'plan');
-		}
+			if (planMode) {
+				args.push('--plan');
+			}
 
-		// Add model selection for Claude models only (opus, sonnet)
-		// OpenCredits models are handled via env vars or router mapping
-		const claudeModels = ['opus', 'sonnet'];
-		if (this._selectedModel && claudeModels.includes(this._selectedModel)) {
-			args.push('--model', this._selectedModel);
-		}
+			const cursorModel = (config.get<string>('cursor.model', '') || '').trim();
+			if (cursorModel) {
+				args.push('--model', cursorModel);
+			}
 
-		// Add session resume if we have a current session
-		if (this._currentSessionId) {
-			args.push('--resume', this._currentSessionId);
+			if (this._currentSessionId) {
+				args.push('--resume', this._currentSessionId);
+			}
+		} else {
+			// Use stream-json for both input and output to enable bidirectional communication.
+			// This is required for stdio-based permission prompts.
+			args = [
+				'--output-format', 'stream-json',
+				'--input-format', 'stream-json',
+				'--verbose'
+			];
+
+			if (yoloMode) {
+				// Yolo mode: skip all permissions
+				args.push('--dangerously-skip-permissions');
+			} else {
+				// Use stdio-based permission prompts (no MCP server needed)
+				args.push('--permission-prompt-tool', 'stdio');
+			}
+
+			// Pass extension's MCP config to Claude CLI (only if file exists)
+			const mcpConfigPath = this._getExtensionMCPConfigPath();
+			if (mcpConfigPath) {
+				try {
+					await vscode.workspace.fs.stat(vscode.Uri.file(mcpConfigPath));
+					args.push('--mcp-config', this.convertToWSLPath(mcpConfigPath));
+				} catch {
+					// File doesn't exist, skip --mcp-config
+				}
+			}
+
+			// Add plan mode if enabled
+			if (planMode) {
+				args.push('--permission-mode', 'plan');
+			}
+
+			// Add model selection for Claude models only (opus, sonnet)
+			// OpenCredits models are handled via env vars or router mapping
+			const claudeModels = ['opus', 'sonnet'];
+			if (this._selectedModel && claudeModels.includes(this._selectedModel)) {
+				args.push('--model', this._selectedModel);
+			}
+
+			// Add session resume if we have a current session
+			if (this._currentSessionId) {
+				args.push('--resume', this._currentSessionId);
+			}
 		}
 
 		const wslEnabled = config.get<boolean>('wsl.enabled', false);
 		const wslDistro = config.get<string>('wsl.distro', 'Ubuntu');
 		const nodePath = config.get<string>('wsl.nodePath', '');
 		const claudePath = config.get<string>('wsl.claudePath', '/usr/local/bin/claude');
+		const cursorPath = config.get<string>('wsl.cursorPath', '/usr/local/bin/cursor-agent');
 		const routerExplicitlyEnabled = config.get<boolean>('router.enabled', false);
 		const customExecutablePath = config.get<string>('executable.path', '');
+		const customCursorExecutablePath = config.get<string>('cursor.executable.path', '');
 		const envsDisabled = config.get<boolean>('environment.disabled', false);
 		const customEnvVars = envsDisabled ? {} : config.get<Record<string, string>>('environment.variables', {});
 
 		// Check if using OpenCredits (base URL contains opencredits.ai)
-		const isOpenCredits = this._isOpenCredits();
+		const isOpenCredits = agent === 'claude' && this._isOpenCredits();
 
 		// Router is only used when explicitly enabled (fallback for older OpenCredits support)
 		// OpenCredits now supports Anthropic API format directly, so env vars pass through
-		const useRouter = routerExplicitlyEnabled && !wslEnabled;
+		const useRouter = agent === 'claude' && routerExplicitlyEnabled && !wslEnabled;
 
 
 		let claudeProcess: cp.ChildProcess;
@@ -998,9 +1081,11 @@ class ClaudeChatProvider {
 			...process.env,
 			FORCE_COLOR: '0',
 			NO_COLOR: '1',
-			...customEnvVars,  // Apply custom environment variables (ANTHROPIC_AUTH_TOKEN, ANTHROPIC_BASE_URL, etc.)
-			CLAUDE_CODE_ENTRYPOINT: 'claude-vscode'
+			...customEnvVars  // Apply custom environment variables (ANTHROPIC_AUTH_TOKEN, ANTHROPIC_BASE_URL, CURSOR_API_KEY, etc.)
 		};
+		if (agent === 'claude') {
+			spawnEnv.CLAUDE_CODE_ENTRYPOINT = 'claude-vscode';
+		}
 
 		// OpenCredits: clear Anthropic-specific vars so Claude CLI uses env vars directly
 		if (isOpenCredits) {
@@ -1032,17 +1117,21 @@ class ClaudeChatProvider {
 				wslEnvOverrides['DISABLE_TELEMETRY'] = 'true';
 				wslEnvOverrides['DISABLE_COST_WARNINGS'] = 'true';
 			}
-			wslEnvOverrides['CLAUDE_CODE_ENTRYPOINT'] = 'claude-vscode';
+			if (agent === 'claude') {
+				wslEnvOverrides['CLAUDE_CODE_ENTRYPOINT'] = 'claude-vscode';
+			}
 			const envExports = Object.entries(wslEnvOverrides)
 				.map(([k, v]) => `export ${k}="${v.replace(/"/g, '\\"')}"`)
 				.join(' && ');
 			const envPrefix = envExports ? envExports + ' && ' : '';
 
-			const wslCommand = envPrefix + this._buildWslClaudeCommand(nodePath, claudePath, args);
+			const wslExecutablePath = agent === 'cursor' ? cursorPath : claudePath;
+			const wslCommand = envPrefix + this._buildWslClaudeCommand(agent === 'cursor' ? '' : nodePath, wslExecutablePath, args);
 
 			// Track WSL state for proper process termination
 			this._isWslProcess = true;
 			this._wslDistro = wslDistro;
+			this._wslProcessName = this._getAgentProcessName(agent);
 
 			claudeProcess = cp.spawn('wsl', ['-d', wslDistro, 'bash', '-ic', wslCommand], {
 				signal: this._abortController.signal,
@@ -1054,16 +1143,20 @@ class ClaudeChatProvider {
 		} else {
 			// Not using WSL
 			this._isWslProcess = false;
+			this._wslProcessName = this._getAgentProcessName(agent);
 
 			// Use native claude command (or custom executable if configured).
 			// shell:true is only needed on Windows when we don't have an absolute path —
 			// cmd.exe's resolver finds .cmd/.bat shims on PATH. With an absolute .exe
 			// path we skip shell wrapping to avoid cmd.exe mis-quoting paths with spaces
 			// (e.g. the default globalStorage location "...Application Support...").
-			const executable = customExecutablePath || 'claude';
+			const executable = agent === 'cursor'
+				? (customCursorExecutablePath || 'cursor-agent')
+				: (customExecutablePath || 'claude');
+			const hasCustomExecutable = agent === 'cursor' ? !!customCursorExecutablePath : !!customExecutablePath;
 			claudeProcess = cp.spawn(executable, args, {
 				signal: this._abortController.signal,
-				shell: process.platform === 'win32' && !customExecutablePath,
+				shell: process.platform === 'win32' && !hasCustomExecutable,
 				detached: process.platform !== 'win32',
 				cwd: cwd,
 				stdio: ['pipe', 'pipe', 'pipe'],
@@ -1074,71 +1167,48 @@ class ClaudeChatProvider {
 		// Store process reference for potential termination
 		this._currentClaudeProcess = claudeProcess;
 
-		// Send the message to Claude's stdin as JSON (stream-json input format)
-		// Don't end stdin yet - we need to keep it open for permission responses
+		// Send the message to the selected agent using that CLI's expected stdin format.
 		if (claudeProcess.stdin) {
-			// First, send an initialize request to get account info (once per session)
-			if (!this._accountInfoFetchedThisSession) {
-				this._accountInfoFetchedThisSession = true;
-				const initRequest = {
-					type: 'control_request',
-					request_id: 'init-' + Date.now(),
-					request: {
-						subtype: 'initialize'
-					}
-				};
-				claudeProcess.stdin.write(JSON.stringify(initRequest) + '\n');
-			}
-
-			// Build message content — detect image file paths and inline them as base64
-			const content: Array<{type: string; text?: string; source?: {type: string; media_type: string; data: string}}> = [];
-			const imageExtensions = ClaudeChatProvider.IMAGE_EXTENSIONS;
-			const imageMediaTypes = ClaudeChatProvider.IMAGE_MEDIA_TYPES;
-
-			// Scan message for image file paths and inline them as base64
-			const imagePathRegex = /(\/[^\s]+\.(?:png|jpg|jpeg|gif|webp|bmp))\b/gi;
-			let lastIndex = 0;
-			let match;
-			while ((match = imagePathRegex.exec(actualMessage)) !== null) {
-				const imagePath = match[1];
-				const ext = path.extname(imagePath).toLowerCase();
-				if (imageExtensions.includes(ext)) {
-					try {
-						const imageData = await vscode.workspace.fs.readFile(vscode.Uri.file(imagePath));
-						const base64 = Buffer.from(imageData).toString('base64');
-						// Flush text before this match
-						const textBefore = actualMessage.substring(lastIndex, match.index);
-						if (textBefore.trim()) {
-							content.push({ type: 'text', text: textBefore.trim() });
+			if (agent === 'cursor') {
+				this._resetCursorStreamState();
+				const prompt = this._buildCursorPrompt(actualMessage, images);
+				claudeProcess.stdin.write(prompt);
+				claudeProcess.stdin.end();
+			} else {
+				// First, send an initialize request to get account info (once per session)
+				if (!this._accountInfoFetchedThisSession) {
+					this._accountInfoFetchedThisSession = true;
+					const initRequest = {
+						type: 'control_request',
+						request_id: 'init-' + Date.now(),
+						request: {
+							subtype: 'initialize'
 						}
-						content.push({
-							type: 'image',
-							source: {
-								type: 'base64',
-								media_type: imageMediaTypes[ext] || 'image/png',
-								data: base64
-							}
-						});
-						lastIndex = match.index + match[0].length;
-					} catch (e) {
-						console.error('Could not read image file:', imagePath, e);
-					}
+					};
+					claudeProcess.stdin.write(JSON.stringify(initRequest) + '\n');
 				}
-			}
-			// Add remaining text
-			const remaining = actualMessage.substring(lastIndex);
-			if (remaining.trim()) {
-				content.push({ type: 'text', text: remaining.trim() });
-			}
 
-			// Add explicitly attached images
-			if (images && images.length > 0) {
-				for (const imagePath of images) {
-					const ext = imageExtensions.find(e => imagePath.toLowerCase().endsWith(e));
-					if (ext) {
+				// Build message content — detect image file paths and inline them as base64
+				const content: Array<{type: string; text?: string; source?: {type: string; media_type: string; data: string}}> = [];
+				const imageExtensions = ClaudeChatProvider.IMAGE_EXTENSIONS;
+				const imageMediaTypes = ClaudeChatProvider.IMAGE_MEDIA_TYPES;
+
+				// Scan message for image file paths and inline them as base64
+				const imagePathRegex = /(\/[^\s]+\.(?:png|jpg|jpeg|gif|webp|bmp))\b/gi;
+				let lastIndex = 0;
+				let match;
+				while ((match = imagePathRegex.exec(actualMessage)) !== null) {
+					const imagePath = match[1];
+					const ext = path.extname(imagePath).toLowerCase();
+					if (imageExtensions.includes(ext)) {
 						try {
 							const imageData = await vscode.workspace.fs.readFile(vscode.Uri.file(imagePath));
 							const base64 = Buffer.from(imageData).toString('base64');
+							// Flush text before this match
+							const textBefore = actualMessage.substring(lastIndex, match.index);
+							if (textBefore.trim()) {
+								content.push({ type: 'text', text: textBefore.trim() });
+							}
 							content.push({
 								type: 'image',
 								source: {
@@ -1147,29 +1217,58 @@ class ClaudeChatProvider {
 									data: base64
 								}
 							});
+							lastIndex = match.index + match[0].length;
 						} catch (e) {
-							console.error('Could not read attached image:', imagePath, e);
+							console.error('Could not read image file:', imagePath, e);
 						}
 					}
 				}
-			}
+				// Add remaining text
+				const remaining = actualMessage.substring(lastIndex);
+				if (remaining.trim()) {
+					content.push({ type: 'text', text: remaining.trim() });
+				}
 
-			// Ensure at least one text block
-			if (content.length === 0) {
-				content.push({ type: 'text', text: actualMessage });
-			}
+				// Add explicitly attached images
+				if (images && images.length > 0) {
+					for (const imagePath of images) {
+						const ext = imageExtensions.find(e => imagePath.toLowerCase().endsWith(e));
+						if (ext) {
+							try {
+								const imageData = await vscode.workspace.fs.readFile(vscode.Uri.file(imagePath));
+								const base64 = Buffer.from(imageData).toString('base64');
+								content.push({
+									type: 'image',
+									source: {
+										type: 'base64',
+										media_type: imageMediaTypes[ext] || 'image/png',
+										data: base64
+									}
+								});
+							} catch (e) {
+								console.error('Could not read attached image:', imagePath, e);
+							}
+						}
+					}
+				}
 
-			const userMessage = {
-				type: 'user',
-				session_id: this._currentSessionId || '',
-				message: {
-					role: 'user',
-					content: content
-				},
-				parent_tool_use_id: null
-			};
-			const userMessageJson = JSON.stringify(userMessage);
+				// Ensure at least one text block
+				if (content.length === 0) {
+					content.push({ type: 'text', text: actualMessage });
+				}
+
+				const userMessage = {
+					type: 'user',
+					session_id: this._currentSessionId || '',
+					message: {
+						role: 'user',
+						content: content
+					},
+					parent_tool_use_id: null
+				};
+				const userMessageJson = JSON.stringify(userMessage);
 				claudeProcess.stdin.write(userMessageJson + '\n');
+			}
 		}
 
 		let rawOutput = '';
@@ -1188,28 +1287,34 @@ class ClaudeChatProvider {
 						try {
 							const jsonData = JSON.parse(line.trim());
 
-							// Handle control_request messages (permission requests via stdio)
-							if (jsonData.type === 'control_request') {
-								this._handleControlRequest(jsonData, claudeProcess).catch(err => {
-									console.error('Error handling control request:', err);
+							if (agent === 'cursor') {
+								this._processCursorStreamData(jsonData).catch(err => {
+									console.error('Error handling Cursor stream data:', err);
 								});
-								continue;
-							}
-
-							// Handle control_response messages (responses to our initialize request)
-							if (jsonData.type === 'control_response') {
-								this._handleControlResponse(jsonData);
-								continue;
-							}
-
-							// Handle result message - end stdin when done
-							if (jsonData.type === 'result') {
-								if (claudeProcess.stdin && !claudeProcess.stdin.destroyed) {
-									claudeProcess.stdin.end();
+							} else {
+								// Handle control_request messages (permission requests via stdio)
+								if (jsonData.type === 'control_request') {
+									this._handleControlRequest(jsonData, claudeProcess).catch(err => {
+										console.error('Error handling control request:', err);
+									});
+									continue;
 								}
-							}
 
-							this._processJsonStreamData(jsonData);
+								// Handle control_response messages (responses to our initialize request)
+								if (jsonData.type === 'control_response') {
+									this._handleControlResponse(jsonData);
+									continue;
+								}
+
+								// Handle result message - end stdin when done
+								if (jsonData.type === 'result') {
+									if (claudeProcess.stdin && !claudeProcess.stdin.destroyed) {
+										claudeProcess.stdin.end();
+									}
+								}
+
+								this._processJsonStreamData(jsonData);
+							}
 						} catch (error) {
 							console.error('Failed to parse JSON line:', line, error);
 						}
@@ -1228,6 +1333,10 @@ class ClaudeChatProvider {
 
 			if (!this._currentClaudeProcess) {
 				return;
+			}
+
+			if (agent === 'cursor') {
+				this._flushCursorBuffers();
 			}
 
 			// Clear process reference
@@ -1251,8 +1360,15 @@ class ClaudeChatProvider {
 			});
 
 			if (code !== 0 && errorOutput.trim()) {
-				// Check if claude command is not installed (Windows cmd.exe)
-				if (errorOutput.includes('not recognized as an internal or external command')) {
+				if (agent === 'cursor' && this._isCursorAuthError(errorOutput)) {
+					this._handleLoginRequired();
+				} else if (agent === 'cursor') {
+					this._sendAndSaveMessage({
+						type: 'error',
+						data: errorOutput.trim()
+					});
+				} else if (errorOutput.includes('not recognized as an internal or external command')) {
+					// Check if claude command is not installed (Windows cmd.exe)
 					this._postMessage({
 						type: 'showInstallModal',
 						installAttempted: !!this._context.globalState.get('installAttempted')
@@ -1268,7 +1384,7 @@ class ClaudeChatProvider {
 		});
 
 		claudeProcess.on('error', (error) => {
-			console.error('Claude process error:', error.message);
+			console.error(`${agentLabel} process error:`, error.message);
 
 			if (!this._currentClaudeProcess) {
 				return;
@@ -1293,7 +1409,14 @@ class ClaudeChatProvider {
 			});
 
 			// Check if claude command is not installed
-			if (error.message.includes('ENOENT') || error.message.includes('command not found') || error.message.includes('not recognized as an internal or external command')) {
+			if (this._isLikelyCommandNotFound(error.message)) {
+				if (agent === 'cursor') {
+					this._sendAndSaveMessage({
+						type: 'error',
+						data: 'Cursor Agent CLI was not found. Install it with: curl https://cursor.com/install -fsS | bash, then run cursor-agent login.'
+					});
+					return;
+				}
 				this._postMessage({
 					type: 'showInstallModal',
 					installAttempted: !!this._context.globalState.get('installAttempted')
@@ -1301,10 +1424,401 @@ class ClaudeChatProvider {
 			} else {
 				this._sendAndSaveMessage({
 					type: 'error',
-					data: `Error running Claude: ${error.message}`
+					data: `Error running ${agentLabel}: ${error.message}`
 				});
 			}
 		});
+	}
+
+	private _resetCursorStreamState(): void {
+		this._cursorAssistantBuffer = '';
+		this._cursorThinkingBuffer = '';
+		this._cursorToolCalls.clear();
+	}
+
+	private _buildCursorPrompt(message: string, images?: string[]): string {
+		if (!images || images.length === 0) {
+			return message;
+		}
+
+		const imageList = images.map(imagePath => `- ${imagePath}`).join('\n');
+		return `${message}\n\nAttached image file paths:\n${imageList}\n`;
+	}
+
+	private _isCursorAuthError(output: string): boolean {
+		return output.includes("Authentication required. Please run 'cursor-agent login'") ||
+			output.includes('CURSOR_API_KEY') ||
+			output.toLowerCase().includes('authentication required');
+	}
+
+	private _flushCursorBuffers(): void {
+		if (this._cursorThinkingBuffer.trim()) {
+			this._sendAndSaveMessage({
+				type: 'thinking',
+				data: this._cursorThinkingBuffer.trim()
+			});
+			this._cursorThinkingBuffer = '';
+		}
+
+		if (this._cursorAssistantBuffer.trim()) {
+			this._sendAndSaveMessage({
+				type: 'output',
+				data: this._cursorAssistantBuffer.trim()
+			});
+			this._cursorAssistantBuffer = '';
+		}
+	}
+
+	private _extractCursorText(message: any): string {
+		const content = Array.isArray(message?.content) ? message.content : [];
+		return content
+			.filter((item: any) => item?.type === 'text' && typeof item.text === 'string')
+			.map((item: any) => item.text)
+			.join('');
+	}
+
+	private _extractCursorSessionId(jsonData: any): string | undefined {
+		if (jsonData?.type === 'system') {
+			return undefined;
+		}
+		return typeof jsonData?.session_id === 'string' && jsonData.session_id.trim()
+			? jsonData.session_id
+			: undefined;
+	}
+
+	private async _processCursorStreamData(jsonData: any): Promise<void> {
+		const sessionId = this._extractCursorSessionId(jsonData);
+		if (sessionId && sessionId !== this._currentSessionId) {
+			this._currentSessionId = sessionId;
+			this._sendAndSaveMessage({
+				type: 'sessionInfo',
+				data: {
+					sessionId,
+					tools: [],
+					mcpServers: []
+				}
+			});
+		}
+
+		switch (jsonData.type) {
+			case 'system':
+				if (!this._currentSessionId && typeof jsonData.session_id === 'string' && jsonData.session_id.trim()) {
+					this._currentSessionId = jsonData.session_id;
+				}
+				if (jsonData.subtype === 'init' && jsonData.model) {
+					this._sendAndSaveMessage({
+						type: 'sessionInfo',
+						data: {
+							sessionId: this._currentSessionId || jsonData.session_id || '',
+							tools: [],
+							mcpServers: [],
+							model: jsonData.model
+						}
+					});
+				}
+				break;
+
+			case 'assistant': {
+				const text = this._extractCursorText(jsonData.message);
+				if (text) {
+					this._cursorAssistantBuffer += text;
+				}
+				break;
+			}
+
+			case 'thinking':
+				if (typeof jsonData.text === 'string' && jsonData.text) {
+					this._cursorThinkingBuffer += jsonData.text;
+				}
+				break;
+
+			case 'tool_call':
+				this._flushCursorBuffers();
+				await this._handleCursorToolCall(jsonData);
+				break;
+
+			case 'result':
+				this._flushCursorBuffers();
+				if (jsonData.is_error && jsonData.result) {
+					this._sendAndSaveMessage({
+						type: 'error',
+						data: typeof jsonData.result === 'string' ? jsonData.result : JSON.stringify(jsonData.result, null, 2)
+					});
+				} else {
+					this._requestCount++;
+					this._postMessage({
+						type: 'updateTotals',
+						data: {
+							totalCost: this._totalCost,
+							totalTokensInput: this._totalTokensInput,
+							totalTokensOutput: this._totalTokensOutput,
+							requestCount: this._requestCount,
+							currentDuration: jsonData.duration_ms
+						}
+					});
+				}
+				break;
+		}
+	}
+
+	private async _handleCursorToolCall(jsonData: any): Promise<void> {
+		const subtype = typeof jsonData.subtype === 'string' ? jsonData.subtype.toLowerCase() : '';
+		const callId = typeof jsonData.call_id === 'string' ? jsonData.call_id : `cursor-call-${Date.now()}`;
+		const parsed = this._parseCursorToolCall(jsonData.tool_call);
+
+		if (subtype === 'started') {
+			let fileContentBefore: string | undefined;
+			let startLine: number | undefined;
+			let startLines: number[] | undefined;
+
+			if (parsed.rawInput?.file_path && ['Edit', 'MultiEdit', 'Write'].includes(parsed.toolName)) {
+				try {
+					const fileData = await vscode.workspace.fs.readFile(vscode.Uri.file(parsed.rawInput.file_path));
+					fileContentBefore = Buffer.from(fileData).toString('utf8');
+				} catch {
+					fileContentBefore = '';
+				}
+
+				if (parsed.toolName === 'Edit' && parsed.rawInput.old_string) {
+					startLine = this._findStartLine(fileContentBefore, parsed.rawInput.old_string);
+				} else if (parsed.toolName === 'MultiEdit' && Array.isArray(parsed.rawInput.edits)) {
+					startLines = parsed.rawInput.edits.map((edit: any) => this._findStartLine(fileContentBefore!, edit.old_string));
+				}
+			}
+
+			this._cursorToolCalls.set(callId, {
+				toolName: parsed.toolName,
+				rawInput: parsed.rawInput,
+				fileContentBefore,
+				startLine,
+				startLines
+			});
+
+			this._sendAndSaveMessage({
+				type: 'toolUse',
+				data: {
+					toolInfo: `🔧 Executing: ${parsed.toolName}`,
+					toolInput: '',
+					rawInput: parsed.rawInput,
+					toolName: parsed.toolName,
+					fileContentBefore,
+					startLine,
+					startLines
+				}
+			});
+			return;
+		}
+
+		if (subtype === 'completed') {
+			const state = this._cursorToolCalls.get(callId) || {
+				toolName: parsed.toolName,
+				rawInput: parsed.rawInput
+			};
+			this._cursorToolCalls.delete(callId);
+
+			let fileContentAfter: string | undefined;
+			if (state.rawInput?.file_path && ['Edit', 'MultiEdit', 'Write'].includes(state.toolName)) {
+				try {
+					const fileData = await vscode.workspace.fs.readFile(vscode.Uri.file(state.rawInput.file_path));
+					fileContentAfter = Buffer.from(fileData).toString('utf8');
+				} catch {
+					fileContentAfter = '';
+				}
+			}
+
+			this._sendAndSaveMessage({
+				type: 'toolResult',
+				data: {
+					content: this._formatCursorToolResult(parsed.result),
+					isError: this._cursorResultIsError(parsed.result),
+					toolUseId: callId,
+					toolName: state.toolName,
+					rawInput: state.rawInput,
+					fileContentAfter,
+					startLine: state.startLine,
+					startLines: state.startLines,
+					hidden: (state.toolName === 'Read' || state.toolName === 'TodoWrite') && !this._cursorResultIsError(parsed.result)
+				}
+			});
+		}
+	}
+
+	private _findStartLine(content: string, needle: string | undefined): number {
+		if (!needle) {
+			return 1;
+		}
+		const position = content.indexOf(needle);
+		if (position === -1) {
+			return 1;
+		}
+		const textBefore = content.substring(0, position);
+		return (textBefore.match(/\n/g) || []).length + 1;
+	}
+
+	private _parseCursorToolCall(toolCall: any): { toolName: string; rawInput: any; result: any } {
+		if (!toolCall || typeof toolCall !== 'object') {
+			return { toolName: 'Tool', rawInput: {}, result: undefined };
+		}
+
+		const [key, payload] = Object.entries(toolCall)[0] || ['unknownTool', {}];
+		const data: any = payload || {};
+		const args = data.args || {};
+		const result = data.result;
+
+		switch (key) {
+			case 'shellToolCall':
+				return { toolName: 'Bash', rawInput: { command: args.command || '' }, result };
+			case 'readToolCall':
+				return { toolName: 'Read', rawInput: { file_path: args.path, offset: args.offset, limit: args.limit }, result };
+			case 'writeToolCall':
+				return { toolName: 'Write', rawInput: { file_path: args.path, content: args.contents || args.content || args.fileText || args.file_text || '' }, result };
+			case 'editToolCall':
+				return this._parseCursorEditTool(args, result);
+			case 'deleteToolCall':
+				return { toolName: 'Edit', rawInput: { file_path: args.path, old_string: '', new_string: '' }, result };
+			case 'globToolCall':
+				return { toolName: 'Glob', rawInput: { pattern: args.globPattern || args.glob_pattern || '*', path: args.path || args.targetDirectory || args.target_directory }, result };
+			case 'grepToolCall':
+				return { toolName: 'Grep', rawInput: args, result };
+			case 'semSearchToolCall':
+				return { toolName: 'Grep', rawInput: { pattern: args.query, path: args.targetDirectories || args.target_directories }, result };
+			case 'lsToolCall':
+				return { toolName: 'LS', rawInput: { path: args.path, ignore: args.ignore }, result };
+			case 'updateTodosToolCall':
+				return { toolName: 'TodoWrite', rawInput: { todos: this._normalizeCursorTodos(args.todos || []) }, result };
+			case 'mcpToolCall':
+				return {
+					toolName: args.toolName || args.tool_name || args.name || 'MCP',
+					rawInput: {
+						name: args.name,
+						args: args.args,
+						providerIdentifier: args.providerIdentifier || args.provider_identifier,
+						toolName: args.toolName || args.tool_name
+					},
+					result
+				};
+			default:
+				return { toolName: key.replace(/ToolCall$/, '') || 'Tool', rawInput: args, result };
+		}
+	}
+
+	private _parseCursorEditTool(args: any, result: any): { toolName: string; rawInput: any; result: any } {
+		const filePath = args.path;
+		const strReplace = args.strReplace || args.str_replace;
+		if (strReplace) {
+			return {
+				toolName: 'Edit',
+				rawInput: {
+					file_path: filePath,
+					old_string: strReplace.oldText || strReplace.old_text || '',
+					new_string: strReplace.newText || strReplace.new_text || '',
+					replace_all: strReplace.replaceAll || strReplace.replace_all
+				},
+				result
+			};
+		}
+
+		const multiStrReplace = args.multiStrReplace || args.multi_str_replace;
+		if (multiStrReplace && Array.isArray(multiStrReplace.edits)) {
+			return {
+				toolName: 'MultiEdit',
+				rawInput: {
+					file_path: filePath,
+					edits: multiStrReplace.edits.map((edit: any) => ({
+						old_string: edit.oldText || edit.old_text || '',
+						new_string: edit.newText || edit.new_text || '',
+						replace_all: edit.replaceAll || edit.replace_all
+					}))
+				},
+				result
+			};
+		}
+
+		const applyPatch = args.applyPatch || args.apply_patch;
+		return {
+			toolName: 'Edit',
+			rawInput: {
+				file_path: filePath,
+				old_string: '',
+				new_string: applyPatch?.patchContent || applyPatch?.patch_content || ''
+			},
+			result
+		};
+	}
+
+	private _normalizeCursorTodos(todos: any[]): any[] {
+		return todos.map(todo => ({
+			content: todo.content,
+			status: this._normalizeCursorTodoStatus(todo.status)
+		}));
+	}
+
+	private _normalizeCursorTodoStatus(status: string): string {
+		switch ((status || '').toLowerCase()) {
+			case 'todo_status_pending':
+				return 'pending';
+			case 'todo_status_in_progress':
+				return 'in_progress';
+			case 'todo_status_completed':
+				return 'completed';
+			case 'todo_status_cancelled':
+				return 'cancelled';
+			default:
+				return status || 'pending';
+		}
+	}
+
+	private _cursorResultIsError(result: any): boolean {
+		if (!result) {
+			return false;
+		}
+		if (result.failure) {
+			return true;
+		}
+		if (result.isError === true || result.is_error === true) {
+			return true;
+		}
+		return false;
+	}
+
+	private _formatCursorToolResult(result: any): string {
+		if (!result) {
+			return 'Tool executed successfully';
+		}
+
+		const outcome = result.success || result.failure || result;
+		const stdout = outcome.stdout || '';
+		const stderr = outcome.stderr || '';
+		const exitCode = outcome.exitCode ?? outcome.exit_code;
+		if (stdout || stderr || exitCode !== undefined) {
+			const parts: string[] = [];
+			if (stdout) {
+				parts.push(stdout);
+			}
+			if (stderr) {
+				parts.push(stderr);
+			}
+			if (exitCode !== undefined) {
+				parts.push(`Exit code: ${exitCode}`);
+			}
+			return parts.join('\n\n') || 'Command completed';
+		}
+
+		if (Array.isArray(outcome.content)) {
+			const text = outcome.content
+				.map((item: any) => item?.text?.text || item?.text || '')
+				.filter(Boolean)
+				.join('\n\n');
+			if (text) {
+				return text;
+			}
+		}
+
+		if (typeof outcome.resultForModel === 'string') {
+			return outcome.resultForModel;
+		}
+
+		return JSON.stringify(result, null, 2);
 	}
 
 	private async _processJsonStreamData(jsonData: any) {
@@ -1648,32 +2162,42 @@ class ClaudeChatProvider {
 		});
 	}
 
-	public newSessionOnConfigChange() {
+	public newSessionOnConfigChange(reason: string = 'Configuration changed') {
 		// Start a new session due to configuration change
 		this._newSession();
 
 		// Show notification to user
 		vscode.window.showInformationMessage(
-			'WSL configuration changed. Started a new Claude session.',
+			`${reason}. Started a new ${this._getAgentLabel()} session.`,
 			'OK'
 		);
 
 		// Send message to webview about the config change
 		this._sendAndSaveMessage({
 			type: 'configChanged',
-			data: '⚙️ WSL configuration changed. Started a new session.'
+			data: `⚙️ ${reason}. Started a new session.`
 		});
 	}
 
 	private async _handleLoginRequired() {
 
 		this._isProcessing = false;
+		const agent = this._getAgentType();
 
 		// Clear processing state
 		this._postMessage({
 			type: 'setProcessing',
 			data: { isProcessing: false }
 		});
+
+		if (agent === 'cursor') {
+			this._openLoginTerminal();
+			this._sendAndSaveMessage({
+				type: 'error',
+				data: "Cursor authentication required. Run 'cursor-agent login' or set CURSOR_API_KEY."
+			});
+			return;
+		}
 
 		// Check if OpenCredits is enabled - if so, show options modal
 		const opencreditsEnabled = await this._checkFeatureFlags();
@@ -2983,6 +3507,7 @@ class ClaudeChatProvider {
 			const filename = `${datePrefix}_${cleanMessage}.json`;
 
 			const conversationData: ConversationData = {
+				agent: this._getAgentType(),
 				sessionId: sessionId,
 				startTime: this._conversationStartTime,
 				endTime: new Date().toISOString(),
@@ -3107,9 +3632,9 @@ class ClaudeChatProvider {
 			// WSL: Kill processes inside WSL using pkill
 			// The Windows PID won't work inside WSL, so we kill by name
 			try {
-				// Kill all node/claude processes started by this session inside WSL
+				// Kill all selected-agent processes started by this session inside WSL
 				const killSignal = signal === 'SIGKILL' ? '-9' : '-15';
-				await exec(`wsl -d ${this._wslDistro} pkill ${killSignal} -f "claude"`);
+				await exec(`wsl -d ${this._wslDistro} pkill ${killSignal} -f "${this._wslProcessName}"`);
 			} catch {
 				// Process may already be dead or pkill not available
 			}
@@ -3180,6 +3705,7 @@ class ClaudeChatProvider {
 	private async _stopClaudeProcess(): Promise<void> {
 
 		this._isProcessing = false;
+		const agentLabel = this._getAgentLabel();
 
 		// Update UI state
 		this._postMessage({
@@ -3196,7 +3722,7 @@ class ClaudeChatProvider {
 		// Send stop confirmation message directly to UI and save
 		this._sendAndSaveMessage({
 			type: 'error',
-			data: '⏹️ Claude code was stopped.'
+			data: `⏹️ ${agentLabel} was stopped.`
 		});
 
 		// Refresh OpenCredits balance (request may have consumed credits)
@@ -3213,6 +3739,7 @@ class ClaudeChatProvider {
 		const indexEntry = {
 			filename: filename,
 			sessionId: conversationData.sessionId,
+			agent: conversationData.agent,
 			startTime: conversationData.startTime || '',
 			endTime: conversationData.endTime,
 			messageCount: conversationData.messageCount,
@@ -3237,7 +3764,8 @@ class ClaudeChatProvider {
 	}
 
 	private _getLatestConversation(): any | undefined {
-		return this._conversationIndex.length > 0 ? this._conversationIndex[0] : undefined;
+		const agent = this._getAgentType();
+		return this._conversationIndex.find(entry => (entry.agent || 'claude') === agent);
 	}
 
 	private async _loadConversationHistory(filename: string): Promise<void> {
@@ -3257,6 +3785,7 @@ class ClaudeChatProvider {
 
 			// Load conversation into current state
 			this._currentConversation = conversationData.messages || [];
+			this._currentSessionId = conversationData.sessionId;
 			this._conversationStartTime = conversationData.startTime;
 			this._totalCost = conversationData.totalCost || 0;
 			this._totalTokensInput = conversationData.totalTokens?.input || 0;
@@ -3362,14 +3891,19 @@ class ClaudeChatProvider {
 	private _sendCurrentSettings(): void {
 		const config = vscode.workspace.getConfiguration('chatRouter');
 		const settings = {
+			'agent': this._getAgentType(),
 			'thinking.intensity': config.get<string>('thinking.intensity', 'think'),
 			'wsl.enabled': config.get<boolean>('wsl.enabled', false),
 			'wsl.distro': config.get<string>('wsl.distro', 'Ubuntu'),
 			'wsl.nodePath': config.get<string>('wsl.nodePath', ''),
 			'wsl.claudePath': config.get<string>('wsl.claudePath', '/usr/local/bin/claude'),
+			'wsl.cursorPath': config.get<string>('wsl.cursorPath', '/usr/local/bin/cursor-agent'),
 			'permissions.yoloMode': config.get<boolean>('permissions.yoloMode', false),
 			'router.enabled': config.get<boolean>('router.enabled', false),
 			'executable.path': config.get<string>('executable.path', ''),
+			'cursor.executable.path': config.get<string>('cursor.executable.path', ''),
+			'cursor.model': config.get<string>('cursor.model', ''),
+			'cursor.force': config.get<boolean>('cursor.force', false),
 			'environment.variables': config.get<Record<string, string>>('environment.variables', {}),
 			'environment.disabled': config.get<boolean>('environment.disabled', false),
 			'isOpenCredits': this._isOpenCredits()
@@ -3604,6 +4138,13 @@ class ClaudeChatProvider {
 	}
 
 	private _openModelTerminal(): void {
+		if (this._getAgentType() === 'cursor') {
+			const message = 'Cursor Agent CLI models are configured in Chat Router Settings with the Cursor Model field.';
+			vscode.window.showInformationMessage(message, 'OK');
+			this._postMessage({ type: 'terminalOpened', data: message });
+			return;
+		}
+
 		// Build command arguments
 		const args = ['/model'];
 
@@ -3634,6 +4175,11 @@ class ClaudeChatProvider {
 	}
 
 	private _openUsageTerminal(_usageType: string): void {
+		if (this._getAgentType() === 'cursor') {
+			vscode.window.showInformationMessage('Usage reporting is only available for Claude Code from Chat Router.', 'OK');
+			return;
+		}
+
 		const terminal = vscode.window.createTerminal({
 			name: 'Claude Usage',
 			location: { viewColumn: vscode.ViewColumn.One },
@@ -3728,33 +4274,34 @@ class ClaudeChatProvider {
 		}
 	}
 
-	private _buildClaudeTerminalOptions(args: string[] = []): { shellPath: string; shellArgs: string[] } {
+	private _buildClaudeTerminalOptions(args: string[] = [], agent: AgentType = this._getAgentType()): { shellPath: string; shellArgs: string[] } {
 		const config = vscode.workspace.getConfiguration('chatRouter');
 		const wslEnabled = config.get<boolean>('wsl.enabled', false);
 
 		if (wslEnabled) {
 			const wslDistro = config.get<string>('wsl.distro', 'Ubuntu');
 			const nodePath = config.get<string>('wsl.nodePath', '');
-			const claudePath = config.get<string>('wsl.claudePath', '/usr/local/bin/claude');
-			const wslCommand = this._buildWslClaudeCommand(nodePath, claudePath, args);
+			const agentPath = this._getWslAgentExecutable(agent);
+			const wslCommand = this._buildWslClaudeCommand(agent === 'cursor' ? '' : nodePath, agentPath, args);
 			return {
 				shellPath: process.platform === 'win32' ? 'wsl.exe' : 'wsl',
 				shellArgs: ['-d', wslDistro, 'bash', '-ic', wslCommand]
 			};
 		}
 
-		const custom = (config.get<string>('executable.path', '') || '').trim();
 		return {
-			shellPath: custom || 'claude',
+			shellPath: this._getNativeAgentExecutable(agent),
 			shellArgs: args
 		};
 	}
 
 	private _openLoginTerminal(): void {
+		const agent = this._getAgentType();
+		const args = agent === 'cursor' ? ['login'] : [];
 		const terminal = vscode.window.createTerminal({
-			name: 'Claude Login',
+			name: `${this._getAgentLabel(agent)} Login`,
 			location: { viewColumn: vscode.ViewColumn.One },
-			...this._buildClaudeTerminalOptions()
+			...this._buildClaudeTerminalOptions(args, agent)
 		});
 		terminal.show();
 	}
@@ -3780,6 +4327,13 @@ class ClaudeChatProvider {
 	}
 
 	private _executeSlashCommand(command: string): void {
+		if (this._getAgentType() === 'cursor') {
+			const message = `/${command} is a Claude Code command and is not available for Cursor Agent CLI.`;
+			vscode.window.showInformationMessage(message, 'OK');
+			this._postMessage({ type: 'terminalOpened', data: message });
+			return;
+		}
+
 		// Handle /compact in chat instead of spawning a terminal
 		if (command === 'compact') {
 			this._sendMessageToClaude(`/${command}`);

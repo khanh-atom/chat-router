@@ -173,6 +173,24 @@
           "default": "/usr/local/bin/claude",
           "description": "Path to Claude executable in the WSL distribution"
         },
+        "chatRouter.wsl.cursorPath": {
+          "type": "string",
+          "default": "/usr/local/bin/cursor-agent",
+          "description": "Path to Cursor Agent CLI executable in the WSL distribution"
+        },
+        "chatRouter.agent": {
+          "type": "string",
+          "enum": [
+            "claude",
+            "cursor"
+          ],
+          "enumDescriptions": [
+            "Claude Code",
+            "Cursor Agent CLI"
+          ],
+          "default": "claude",
+          "description": "Coding agent CLI used by Chat Router."
+        },
         "chatRouter.thinking.intensity": {
           "type": "string",
           "enum": [
@@ -193,6 +211,21 @@
           "type": "string",
           "default": "",
           "description": "Custom path to the Claude Code executable. Leave empty to use the default 'claude' command."
+        },
+        "chatRouter.cursor.executable.path": {
+          "type": "string",
+          "default": "",
+          "description": "Custom path to the Cursor Agent CLI executable. Leave empty to use the default 'cursor-agent' command."
+        },
+        "chatRouter.cursor.model": {
+          "type": "string",
+          "default": "",
+          "description": "Optional Cursor model passed as '--model'. Leave empty to let Cursor choose."
+        },
+        "chatRouter.cursor.force": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run Cursor Agent CLI with '--force'. When disabled, Chat Router passes '--trust'."
         },
         "chatRouter.environment.variables": {
           "type": "object",

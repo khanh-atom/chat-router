@@ -4856,12 +4856,17 @@ const getScript = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'htt
 		function updateSettings() {
 			// Note: thinking intensity is now handled separately in the thinking intensity modal
 
+			const agentType = document.getElementById('agent-type')?.value || 'claude';
 			const wslEnabled = document.getElementById('wsl-enabled').checked;
 			const wslDistro = document.getElementById('wsl-distro').value;
 			const wslNodePath = document.getElementById('wsl-node-path').value;
 			const wslClaudePath = document.getElementById('wsl-claude-path').value;
+			const wslCursorPath = document.getElementById('wsl-cursor-path')?.value || '';
 			const yoloMode = document.getElementById('yolo-mode').checked;
 			const executablePath = document.getElementById('executable-path').value;
+			const cursorExecutablePath = document.getElementById('cursor-executable-path')?.value || '';
+			const cursorModel = document.getElementById('cursor-model')?.value || '';
+			const cursorForce = document.getElementById('cursor-force')?.checked || false;
 			const useRouter = document.getElementById('use-router')?.checked || false;
 
 			// Collect environment variables from key-value UI
@@ -4869,6 +4874,7 @@ const getScript = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'htt
 
 			// Update WSL options visibility
 			document.getElementById('wslOptions').style.display = wslEnabled ? 'block' : 'none';
+			updateAgentSettingsVisibility();
 
 			// Update OpenCredits state from current env vars
 			const baseUrl = envVariables['ANTHROPIC_BASE_URL'] || '';
@@ -4886,25 +4892,44 @@ const getScript = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'htt
 
 			// Send settings to VS Code immediately
 			sendStats('Settings changed', {
+				agent: agentType,
 				wsl_enabled: wslEnabled,
 				yolo_mode: yoloMode,
 				router_enabled: useRouter,
 				has_custom_envs: Object.keys(envVariables).length > 0,
-				has_custom_executable: !!executablePath
+				has_custom_executable: !!executablePath,
+				has_custom_cursor_executable: !!cursorExecutablePath
 			});
 			vscode.postMessage({
 				type: 'updateSettings',
 				settings: {
+					'agent': agentType,
 					'wsl.enabled': wslEnabled,
 					'wsl.distro': wslDistro || 'Ubuntu',
 					'wsl.nodePath': wslNodePath,
 					'wsl.claudePath': wslClaudePath || '/usr/local/bin/claude',
+					'wsl.cursorPath': wslCursorPath || '/usr/local/bin/cursor-agent',
 					'permissions.yoloMode': yoloMode,
 					'executable.path': executablePath,
+					'cursor.executable.path': cursorExecutablePath,
+					'cursor.model': cursorModel,
+					'cursor.force': cursorForce,
 					'environment.variables': envVariables,
 					'router.enabled': useRouter
 				}
 			});
+		}
+
+		function updateAgentSettingsVisibility() {
+			const agentType = document.getElementById('agent-type')?.value || 'claude';
+			const cursorSettings = document.getElementById('cursorCommandSettings');
+			const executablePath = document.getElementById('executable-path');
+			if (cursorSettings) {
+				cursorSettings.style.display = agentType === 'cursor' ? 'block' : 'none';
+			}
+			if (executablePath) {
+				executablePath.closest('div').style.display = agentType === 'cursor' ? 'none' : 'block';
+			}
 		}
 
 		// Provider region filtering
@@ -5173,10 +5198,18 @@ const getScript = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'htt
 					updateThinkingModeToggleName(sliderValue >= 0 ? sliderValue : 0);
 				}
 				
+				const agentSelect = document.getElementById('agent-type');
+				if (agentSelect) {
+					agentSelect.value = message.data['agent'] || 'claude';
+				}
 				document.getElementById('wsl-enabled').checked = message.data['wsl.enabled'] || false;
 				document.getElementById('wsl-distro').value = message.data['wsl.distro'] || 'Ubuntu';
 				document.getElementById('wsl-node-path').value = message.data['wsl.nodePath'] ?? '';
 				document.getElementById('wsl-claude-path').value = message.data['wsl.claudePath'] || '/usr/local/bin/claude';
+				const wslCursorPath = document.getElementById('wsl-cursor-path');
+				if (wslCursorPath) {
+					wslCursorPath.value = message.data['wsl.cursorPath'] || '/usr/local/bin/cursor-agent';
+				}
 				document.getElementById('yolo-mode').checked = message.data['permissions.yoloMode'] || false;
 				
 				// Update yolo warning visibility
@@ -5184,6 +5217,7 @@ const getScript = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'htt
 
 				// Show/hide WSL options
 				document.getElementById('wslOptions').style.display = message.data['wsl.enabled'] ? 'block' : 'none';
+				updateAgentSettingsVisibility();
 
 				// Update router checkbox
 				const useRouterCheckbox = document.getElementById('use-router');
@@ -5193,6 +5227,18 @@ const getScript = (isTelemetryEnabled: boolean, opencreditsApiUrl: string = 'htt
 
 				// Update Customize Claude Command settings
 				document.getElementById('executable-path').value = message.data['executable.path'] || '';
+				const cursorExecutablePath = document.getElementById('cursor-executable-path');
+				if (cursorExecutablePath) {
+					cursorExecutablePath.value = message.data['cursor.executable.path'] || '';
+				}
+				const cursorModel = document.getElementById('cursor-model');
+				if (cursorModel) {
+					cursorModel.value = message.data['cursor.model'] || '';
+				}
+				const cursorForce = document.getElementById('cursor-force');
+				if (cursorForce) {
+					cursorForce.checked = message.data['cursor.force'] || false;
+				}
 				renderEnvVariables(message.data['environment.variables'] || {});
 
 				// Detect OpenCredits and envs disabled state
